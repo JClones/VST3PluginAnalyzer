@@ -15,7 +15,7 @@ GENERATED_DIRECTORIES = {
     '.tools', '.pytest_cache', '.mypy_cache', '.ruff_cache', 'htmlcov', 'Testing',
 }  # Downloaded build tools, test reports and local development caches.
 SOURCE_DIRECTORIES = (
-    'cpp', 'python', 'scripts', 'docs', 'packaging', '.github',
+    'cpp', 'python', 'scripts', 'docs', 'packaging',
 )  # Project-owned trees scanned for generated Python caches without entering the SDK.
 CACHE_DIRECTORIES = {
     '__pycache__', '.pytest_cache', '.mypy_cache', '.ruff_cache',

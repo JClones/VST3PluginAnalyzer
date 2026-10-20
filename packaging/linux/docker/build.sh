@@ -8,7 +8,7 @@ export HOME=/tmp/analyzer-home
 mkdir -p "$HOME" /tmp/analyzer-source
 tar -C /source --exclude=__pycache__ --exclude='*.pyc' --exclude='*.egg-info' \
     -cf - CMakeLists.txt README.md LICENSE THIRD_PARTY_NOTICES.md pyproject.toml \
-    'VST3 Plugin Analyzer.sh' cpp python scripts docs packaging .github | \
+    'VST3 Plugin Analyzer.sh' cpp python scripts docs packaging | \
     tar -C /tmp/analyzer-source -xf -
 cd /tmp/analyzer-source
 if [ ! -f /source/vst3sdk/base/source/fobject.cpp ]; then
