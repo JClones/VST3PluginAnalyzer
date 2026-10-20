@@ -1,0 +1,4 @@
+# Application-managed environment; system Python is never modified.
+numpy>=2,<3
+PySide6-Essentials>=6.8,<6.12
+pyqtgraph>=0.13.7,<1

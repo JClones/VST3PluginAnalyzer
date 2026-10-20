@@ -1,0 +1,9 @@
+# Copyright (c) 2026 vladg/sound
+# SPDX-License-Identifier: MIT
+# Build/smoke-check environment only; third-party packages are not shipped.
+# Tested with Python 3.10 on Ubuntu 22.04.
+numpy==2.2.6
+PySide6-Essentials==6.11.2
+shiboken6==6.11.2
+pyqtgraph==0.14.0
+cmake>=3.25,<4

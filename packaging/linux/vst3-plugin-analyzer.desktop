@@ -1,0 +1,13 @@
+# Copyright (c) 2026 vladg/sound
+# SPDX-License-Identifier: MIT
+# Launch the installed analyzer from the desktop application menu.
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VST3 Plugin Analyzer
+Comment=Measure and inspect VST3 audio effects
+Exec=vst3-plugin-analyzer
+Icon=vst3-plugin-analyzer
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupNotify=true

@@ -1,0 +1,49 @@
+VST3 Plugin Analyzer @VERSION@ for Linux (@ARCH@)
+
+A lightweight VST3 effect analyzer inspired by Christian Budde's VST Plugin
+Analyzer. A C++ host loads the plugin in a separate process; a Python/Qt interface
+provides measurements, interactive plots, and parameter controls. No audio interface is required.
+
+Contains Python source, a compiled C++ plugin host, and desktop assets.
+Python, Qt and other third-party dependencies are NOT bundled. Plugins are separate.
+Requires glibc >= @GLIBC@ and libstdc++ >= @STDCPP@ (GCC runtime package version).
+
+INSTALL
+Extract this archive and open a terminal in the extracted directory.
+For your account:
+  ./install.sh
+For all users:
+  sudo ./install.sh
+
+The installer installs missing system libraries using APT (Ubuntu/Debian) or
+DNF (Fedora). A per-user installation may request sudo for system libraries.
+It uses compatible installed Python libraries when available; otherwise it
+creates a private Python environment and downloads the required libraries.
+An internet connection is needed to download missing dependencies.
+System Python is not modified. Other distributions need their system libraries
+and Python 3.10 or newer installed beforehand.
+
+The application uses NumPy >=2,<3, PySide6 >=6.8,<7 and pyqtgraph >=0.13.7,<1.
+Its private environment currently uses PySide6 below 6.12 for compatibility.
+Plugins and any additional vendor-specific libraries are installed separately.
+
+LAUNCH
+Use the applications menu, or run:
+  ~/.local/bin/vst3-plugin-analyzer
+For an all-user installation:
+  /usr/local/bin/vst3-plugin-analyzer
+
+UNINSTALL
+For your account:
+  ~/.local/lib/vst3-plugin-analyzer/uninstall.sh
+For all users:
+  sudo /usr/local/lib/vst3-plugin-analyzer/uninstall.sh
+The archive's ./uninstall.sh also works: run without sudo for your account,
+or with sudo to remove the all-user installation.
+
+Uninstallation removes the application and its managed Python environment.
+Settings, plugins, system libraries and separately installed Python environments
+are preserved. User installations are under ~/.local; all-user installations
+are under /usr/local. Remove an existing source/package-manager installation
+before switching to a system-wide tar installation. To update a tar installation,
+close the application and run the new archive's installer in the same mode.

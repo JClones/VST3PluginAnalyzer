@@ -1,0 +1,34 @@
+# Copyright (c) 2026 vladg/sound
+# SPDX-License-Identifier: MIT
+[build-system]
+requires = ["setuptools>=77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vst3-plugin-analyzer"
+version = "0.1.0"
+description = "Offline VST3 measurements with a separate native host"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{name = "vladg/sound"}]
+requires-python = ">=3.10"
+dependencies = ["numpy>=2.0,<3"]
+
+[project.optional-dependencies]
+gui = [
+    # PySide6 6.12.0 consumes None references on Python 3.10; keep older non-immortal runtimes below that release.
+    "PySide6-Essentials>=6.8,<6.12; python_version < '3.12'",
+    "PySide6-Essentials>=6.8,<7; python_version >= '3.12'",
+    "pyqtgraph>=0.13.7,<1",
+]
+bundle = ["PyInstaller>=6.17,<7", "delocate>=0.12,<1"]
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.setuptools.package-data]
+"vst3_analyzer.ui" = ["assets/*.ico", "assets/*.svg"]
+
+[tool.setuptools.exclude-package-data]
+"vst3_analyzer.ui" = ["assets/README.md"]

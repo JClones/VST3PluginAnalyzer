@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The isolated host loads VST3 binaries signed by third-party developers. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Permit a debugger to attach to this host and inspect the loaded VST3 plugin. -->
+    <key>com.apple.security.get-task-allow</key>
+    <true/>
+</dict>
+</plist>

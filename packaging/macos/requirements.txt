@@ -1,0 +1,7 @@
+# Universal 2 inputs for the macOS 14.4 target, using Python 3.13 and compatible Qt bindings.
+numpy==2.5.4
+PySide6-Essentials==6.9.3
+shiboken6==6.9.3
+pyqtgraph==0.14.0
+PyInstaller==6.22.3
+delocate==0.13.0

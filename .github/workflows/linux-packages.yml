@@ -1,0 +1,39 @@
+# Copyright (c) 2026 vladg/sound
+# SPDX-License-Identifier: MIT
+# Build baseline-compatible release files on demand; upload artifacts, never publish releases.
+name: Linux packages
+on:
+  workflow_dispatch:
+jobs:
+  packages:
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    steps:
+      - name: Install baseline build and runtime dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y git ca-certificates build-essential \
+            python3-dev python3-venv libx11-dev rpm cpio desktop-file-utils \
+            libgl1 libegl1 libopengl0 libdrm2 libwayland-client0 libwayland-cursor0 libwayland-egl1 libdbus-1-3 libfontconfig1 libfreetype6 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 \
+            libxcb-image0 libxcb-render-util0 libx11-xcb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 fonts-liberation
+      - uses: actions/checkout@v4
+      - name: Fetch SDK and build packages
+        run: |
+          ./scripts/fetch-vst3-sdk.sh
+          ./scripts/build-linux-packages.sh
+          desktop-file-validate packaging/linux/vst3-plugin-analyzer.desktop
+      - name: Verify binary package payloads
+        run: |
+          VST3_ANALYZER_PYTHON="$PWD/.venv-linux-bundle/bin/python" ./scripts/test-linux-packages.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64-packages
+          path: dist/linux/
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: linux-packaging-diagnostics
+          path: |
+            build-linux-bundle/smoke.*
+            build-linux-bundle/dependency-audit.json
