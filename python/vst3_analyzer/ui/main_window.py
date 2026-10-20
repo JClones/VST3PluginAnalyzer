@@ -482,6 +482,7 @@ class MainWindow(QMainWindow):
         # macOS exposes VST3 packages as files in native panels; directory-only panels disable them.
         directory = self.last_plugin_directory
         if sys.platform == "darwin":
+            directory = directory or "/Library/Audio/Plug-Ins/VST3"
             path, _ = QFileDialog.getOpenFileName(self, "Select a VST3 plugin", directory,
                                                 "VST3 plugins (*.vst3)")
         else:

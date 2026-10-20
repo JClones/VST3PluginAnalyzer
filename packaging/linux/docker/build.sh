@@ -11,12 +11,12 @@ tar -C /source --exclude=__pycache__ --exclude='*.pyc' --exclude='*.egg-info' \
     'VST3 Plugin Analyzer.sh' cpp python scripts docs packaging .github | \
     tar -C /tmp/analyzer-source -xf -
 cd /tmp/analyzer-source
-if [ -f /source/vst3sdk/base/source/fobject.cpp ]; then
-    mkdir vst3sdk
-    tar -C /source/vst3sdk --exclude=.git --exclude='._*' -cf - . | tar -C vst3sdk -xf -
-else
-    ./scripts/fetch-vst3-sdk.sh
+if [ ! -f /source/vst3sdk/base/source/fobject.cpp ]; then
+    echo "VST3 SDK submodules are missing. Run git submodule update --init --recursive in the source checkout." >&2
+    exit 1
 fi
+mkdir vst3sdk
+tar -C /source/vst3sdk --exclude=.git --exclude='._*' -cf - . | tar -C vst3sdk -xf -
 {
     cat /etc/os-release
     gcc --version

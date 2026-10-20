@@ -12,11 +12,11 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Fetch pinned VST3 SDK
-        run: ./scripts/fetch-vst3-sdk.sh
       - name: Prepare source installation
         run: ./scripts/setup-macos-source.sh python3
       - name: Check native host IPC

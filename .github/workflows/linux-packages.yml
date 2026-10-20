@@ -18,9 +18,10 @@ jobs:
             libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0 \
             libxcb-image0 libxcb-render-util0 libx11-xcb1 libxcb-randr0 libxcb-sync1 libxcb-xfixes0 fonts-liberation
       - uses: actions/checkout@v4
-      - name: Fetch SDK and build packages
+        with:
+          submodules: recursive
+      - name: Build packages
         run: |
-          ./scripts/fetch-vst3-sdk.sh
           ./scripts/build-linux-packages.sh
           desktop-file-validate packaging/linux/vst3-plugin-analyzer.desktop
       - name: Verify binary package payloads

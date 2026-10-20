@@ -196,8 +196,9 @@ The [Linux guide](docs/linux.md) includes prerequisites, updates and other optio
 
 ### Load and adjust a plugin
 
-Choose **Plugin → Load VST3...** and select a `.vst3` plugin bundle. On Linux the
-picker starts in `~/.vst3` and shows hidden directories. Select the bundle itself,
+Choose **Plugin → Load VST3...** and select a `.vst3` plugin bundle. Without a
+saved directory, the picker starts in `/Library/Audio/Plug-Ins/VST3` on macOS or
+`~/.vst3` on Linux. The Linux picker shows hidden directories. Select the bundle itself,
 not a file inside it. **Plugin → Recent** reopens a recently used plugin;
 **Unload** closes it.
 

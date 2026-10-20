@@ -17,8 +17,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Fetch pinned VST3 SDK
-        run: ./scripts/fetch-vst3-sdk.sh
       - name: Install build, X11, Qt runtime and virtual-display dependencies
         run: |
           sudo apt-get update

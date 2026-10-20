@@ -7,7 +7,6 @@ __pycache__/
 *.egg-info/
 .DS_Store
 ._*
-/.vst3sdk-fetch.*/
 /.pytest_cache/
 /.mypy_cache/
 /.ruff_cache/
