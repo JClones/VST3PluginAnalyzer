@@ -17,6 +17,10 @@ def main(argv=None):
     """Start the GUI, optionally preloading an explicit plugin class."""
     # Keep desktop dependencies optional for headless measurement and protocol users.
     parser = argparse.ArgumentParser(description=__doc__)
+    if sys.platform == "darwin":
+        # Xcode injects this AppKit preference and its YES/NO value into launch arguments.
+        parser.add_argument("-NSDocumentRevisionsDebugMode", "--NSDocumentRevisionsDebugMode",
+                            choices=("YES", "NO"), help=argparse.SUPPRESS)
     parser.add_argument("--connect-socket", help=argparse.SUPPRESS)
     parser.add_argument("--host-pid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--host", default=str(default_host_executable()))
