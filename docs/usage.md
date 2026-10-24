@@ -102,9 +102,18 @@ A clean close saves the first instance’s plugin state and window layout.
 After a crash or force-quit the next launch keeps preferences but skips automatic
 plugin loading. Load the plugin explicitly to try again.
 
-A lost connection or timeout can indicate that the plugin host stopped or became busy.
-Try unloading and reloading the plugin, or restart the analyzer. On Linux, plugin
-editors require X11 or XWayland, plus the libraries required by the plugin vendor.
+If a request takes more than ten seconds, a line above the plot offers
+**Exit application**. You can keep waiting indefinitely, including while the host
+is paused in a debugger. The line disappears when processing resumes. Choosing
+**Exit application** forces a dirty exit. If the host crashes or exits, the
+interface closes automatically; it does not restart the host.
+
+A normal close saves plugin state, waits for the host to finish and marks the
+session clean only if both succeed. Forced exits leave the session dirty, so
+the next launch restores preferences without automatically loading the plugin.
+See the [debugging guide](debugging.md) to launch the native executable in an IDE.
+On Linux, plugin editors require X11 or XWayland, plus the libraries required by
+the plugin vendor.
 
 When reporting an issue, include the analyzer version, OS, CPU architecture,
 plugin name/version and steps to reproduce. No audio-device output is provided.

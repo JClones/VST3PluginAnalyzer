@@ -5,6 +5,7 @@
 import argparse
 from importlib import metadata, util
 import json
+import plistlib
 import os
 from pathlib import Path
 import re
@@ -254,6 +255,14 @@ def build():
     run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--workpath", SUPPORT / "pyinstaller",
          "--distpath", PROJECT / "dist", PROJECT / "packaging/macos/VST3PluginAnalyzer.spec"], env=environment)
     bundle = PROJECT / "dist/VST3 Plugin Analyzer.app"
+    # The IDE/LaunchServices entry point is native; PyInstaller's UI remains a sibling.
+    shutil.copy2(HOST, bundle / "Contents/MacOS/VST3 Plugin Analyzer")
+    info = bundle / "Contents/Info.plist"
+    with info.open("rb") as stream:
+        values = plistlib.load(stream)
+    values["CFBundleExecutable"] = "VST3 Plugin Analyzer"
+    with info.open("wb") as stream:
+        plistlib.dump(values, stream)
     # PyInstaller re-signs collected binaries; apply host-specific entitlements
     # afterwards, then seal the outer bundle again without changing nested code.
     identity = os.environ.get("VST3_ANALYZER_SIGN_IDENTITY") or "-"
@@ -263,7 +272,7 @@ def build():
     run([*signing, "--entitlements",
          PROJECT / "packaging/macos/host.entitlements.plist",
          bundle / "Contents/Frameworks/native/vst3-host-service"])
-    run([*signing, bundle])
+    run([*signing, "--entitlements", PROJECT / "packaging/macos/host.entitlements.plist", bundle])
     verify_bundle(bundle, minimum)
     report = SUPPORT / "bundle-check.json"
     report.unlink(missing_ok=True)

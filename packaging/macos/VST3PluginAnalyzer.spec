@@ -31,7 +31,7 @@ pyz = PYZ(a.pure)
 # Reject thin Python extensions rather than producing an application that only partly supports Intel.
 exe = EXE(
     pyz, a.scripts, [], exclude_binaries=True,
-    name="VST3 Plugin Analyzer", debug=False, bootloader_ignore_signals=False,
+    name="VST3PluginAnalyzerUI", debug=False, bootloader_ignore_signals=False,
     strip=False, upx=False, console=False, argv_emulation=False,
     target_arch="universal2", codesign_identity=signing_identity, entitlements_file=None,
 )

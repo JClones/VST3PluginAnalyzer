@@ -283,9 +283,16 @@ You can run multiple instances; each connects to its own plugin host. The first
 instance saves preferences and the session. Additional instances start with the
 current preferences and no plugin loaded, and their session changes are temporary.
 
-If a plugin crashes, its host may close and the analyzer may report a lost
-connection or timeout. Try unloading and reopening the plugin or restarting the
-analyzer. When reporting a problem, include the
+If a plugin crashes or its host exits, the analyzer closes too. If a request takes
+longer than ten seconds, a line above the plot offers **Exit application**; you
+can also keep waiting indefinitely. The line disappears when the request completes.
+A normal close saves plugin state and waits for shutdown; forced exits skip
+automatic plugin loading on the next launch.
+
+For plugin debugging, launch the native executable directly under your IDE's
+debugger. It starts the interface automatically. See the [debugging guide](docs/debugging.md).
+
+When reporting a problem, include the
 analyzer version, OS, CPU architecture, plugin name/version and steps to reproduce.
 
 ## License and credits

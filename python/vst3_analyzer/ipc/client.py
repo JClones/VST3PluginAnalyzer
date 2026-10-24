@@ -11,6 +11,8 @@ import threading
 import time
 import logging
 import os
+import select
+import signal
 
 from .protocol import ProtocolError, VERSION, encode_frame, receive_frame
 
@@ -31,14 +33,15 @@ class HostError(RuntimeError):
 
 
 class HostDisconnected(ConnectionError):
-    """Transport failure or timeout; restart and reload before continuing."""
+    """Transport failure; the desktop exits, while headless callers may explicitly restart."""
 
 
 class HostClient:
-    """Own one service process and serialize calls; run blocking calls outside a future GUI thread."""
+    """Serialize requests to an owned subprocess or an explicitly connected native host."""
 
     def __init__(self, executable: str | Path, *, timeout: float = 10.0, transport: str = "socketpair",
-                 initialization_timeout: float | None = None):
+                 initialization_timeout: float | None = None,
+                 endpoint=None, host_pid=None, wait_forever=False):
         """Configure the executable, normal timeout, transport and optional longer initialization_timeout."""
         # Resolve early so changing the working directory does not alter service selection.
         if not math.isfinite(timeout) or timeout <= 0:
@@ -47,6 +50,11 @@ class HostClient:
             raise ValueError("Transport must be socketpair or named")
         if initialization_timeout is not None and (not math.isfinite(initialization_timeout) or initialization_timeout <= 0):
             raise ValueError("Initialization timeout must be positive")
+        self.endpoint = endpoint
+        self.host_pid = host_pid
+        self.wait_forever = wait_forever
+        self.request_started = None  # Polled by the GUI timer; no per-audio-request watchdog threads.
+        self.forced = False
         self.transport = transport  # Connected inherited pair by default; named path is optional.
         self.executable = Path(executable).resolve()  # Native host binary to launch.
         self.timeout = timeout  # Blocking operation/startup timeout in seconds.
@@ -79,7 +87,11 @@ class HostClient:
             self._log = tempfile.TemporaryFile()
             LOGGER.info("Starting host: executable=%s transport=%s", self.executable, self.transport)
             try:
-                if self.transport == "socketpair":
+                if self.endpoint:
+                    self._socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    self._socket.settimeout(None if self.wait_forever else self.timeout)
+                    self._socket.connect(self.endpoint)
+                elif self.transport == "socketpair":
                     # Pass only the child's AF_UNIX endpoint; no filesystem socket or accept race.
                     parent, child = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
                     self._socket = parent
@@ -116,6 +128,8 @@ class HostClient:
                         except BaseException:
                             connection.close()
                             raise
+                if self.wait_forever:
+                    self._socket.settimeout(None)
                 self._next_id = 1
                 self.capabilities = self.request("hello", protocol_version=VERSION)
                 if self.capabilities.get("protocol_version") != VERSION:
@@ -151,7 +165,8 @@ class HostClient:
                 connection.settimeout(max(normal_timeout, self.initialization_timeout))
             operation_timeout = connection.gettimeout()
             started = time.monotonic()
-            pid = self._process.pid if self._process is not None else None
+            self.request_started = started
+            pid = self._process.pid if self._process is not None else self.host_pid
             if command in TRACED_COMMANDS:
                 LOGGER.info("Host request started: command=%s id=%d pid=%s timeout=%s path=%s",
                             command, request_id, pid, operation_timeout, fields.get("path", ""))
@@ -187,6 +202,7 @@ class HostClient:
                 self._dispose()
                 raise HostDisconnected(message) from error
             finally:
+                self.request_started = None
                 # A slow initialization request must never relax the next audio/polling/shutdown timeout.
                 if self._socket is connection:
                     connection.settimeout(normal_timeout)
@@ -208,20 +224,53 @@ class HostClient:
             self.close()
             self.start()
 
+    def check_alive(self):
+        """Detect an idle peer's exit without consuming protocol bytes."""
+        connection = self._socket
+        if connection is None:
+            raise HostDisconnected("The application host has exited")
+        if select.select([connection], [], [], 0)[0] and not connection.recv(1, socket.MSG_PEEK):
+            raise HostDisconnected("The application host has exited")
+
+    def abort(self):
+        """Interrupt even a blocked exchange; this method must not acquire the IPC lock."""
+        self.forced = True
+        process = self._process
+        try:
+            if process is not None and process.poll() is None:
+                process.kill()
+            elif self.endpoint and self.host_pid:
+                os.kill(self.host_pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        connection = self._socket
+        if connection is not None:
+            try:
+                connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
     def close(self):
-        """Return true after graceful shutdown; terminate/kill an unresponsive service and return false."""
+        """Wait for normal shutdown, or release a failed/forced connection."""
         with self._lock:
             clean = False
-            # A plugin may hang; cleanup cannot depend on it acknowledging shutdown.
-            if self._socket is not None and self._process is not None and self._process.poll() is None:
+            if self._socket is not None and not self.forced:
                 try:
-                    self._socket.settimeout(min(self.timeout, 0.5))
-                    self.request("shutdown")
-                    clean = self._process.wait(timeout=0.5) == 0
+                    if not self.wait_forever:
+                        self._socket.settimeout(min(self.timeout, 0.5))
+                    self.request("exit" if self.wait_forever else "shutdown")
+                    self.request_started = time.monotonic()
+                    try:
+                        if self.endpoint:
+                            clean = self._socket.recv(1) == b""
+                        elif self._process is not None:
+                            clean = self._process.wait(timeout=None if self.wait_forever else 0.5) == 0
+                    finally:
+                        self.request_started = None
                 except (OSError, RuntimeError, subprocess.TimeoutExpired):
                     pass
             self._dispose()
-            return clean
+            return clean and not self.forced
 
     def _dispose(self):
         """Release owned resources without issuing protocol commands."""

@@ -13,7 +13,8 @@ if [ "$(uname -s)" = Darwin ] && [ -d "$project_dir/.venv-macos-source" ]; then
         printf '%s\n' 'Source setup is incomplete. Run ./scripts/setup-macos-source.sh first.' >&2
         exit 1
     fi
-    exec "$source_python" -m vst3_analyzer.ui --host "$source_host" "$@"
+    export VST3_ANALYZER_PYTHON="$source_python"
+    exec "$source_host" "$@"
 fi
 
 # Keep the original development/Linux environment and optional arguments supported.
@@ -21,4 +22,4 @@ if [ ! -x "$project_dir/.venv/bin/python" ]; then
     printf '%s\n' 'Python environment is missing. On macOS run ./scripts/setup-macos-source.sh; on Linux see docs/linux.md.' >&2
     exit 1
 fi
-exec "$project_dir/.venv/bin/python" -m vst3_analyzer.ui "$@"
+exec "$project_dir/build/bin/Release/vst3-host-service" "$@"

@@ -65,15 +65,8 @@ def prepare(args):
         shutil.copy2(PROJECT / 'vst3sdk/vstgui4/vstgui/thirdparty/rapidjson/license.txt',
                      notices / 'RapidJSON-LICENSE.txt')
         launcher = runtime / NAME
-        launcher.write_text('''#!/bin/sh
-# Copyright (c) 2026 vladg/sound
-# SPDX-License-Identifier: MIT
-# Launch the installed source runtime without importing the checkout or user Python packages.
-set -eu
-runtime=$(dirname -- "$(readlink -f -- "$0")")
-exec "$runtime/venv/bin/python" -I -m vst3_analyzer.ui --host "$runtime/native/vst3-host-service" "$@"
-''')
-        launcher.chmod(0o755)
+        launcher.symlink_to('native/vst3-host-service')
+        shutil.copy2(PROJECT / 'packaging/common/entrypoint.py', runtime / 'entrypoint.py')
         shutil.copy2(PROJECT / 'packaging/linux/vst3-plugin-analyzer.desktop', Path(temporary) / (NAME + '.desktop'))
         shutil.copy2(PROJECT / 'python/vst3_analyzer/ui/assets/VST3_Icon.svg', Path(temporary) / (NAME + '.svg'))
         (runtime / MARKER).write_text(json.dumps({'version': version, 'format': 1}) + '\n')

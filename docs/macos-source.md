@@ -66,8 +66,8 @@ Or load a plugin immediately:
 ```
 
 No environment activation is required. The starter resolves the project directory
-from its own location, selects `.venv-macos-source` and passes the corresponding
-host path to the UI. It also works when invoked by absolute path from another
+from its own location and starts the native host, which launches the UI using
+`.venv-macos-source`. It also works when invoked by absolute path from another
 directory. If no macOS source environment exists, it retains the original `.venv`
 Linux/local-environment behavior. Additional UI arguments are forwarded unchanged.
 

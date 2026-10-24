@@ -5,6 +5,7 @@
  * @brief Unix socket setup, bounded readiness polling and reliable framed reads and writes.
  */
 #include "ipc/unix_socket.h"
+#include <fcntl.h>
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>
@@ -81,6 +82,7 @@ UnixSocket::UnixSocket(const std::string& path) : path_(path) {
     listener_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
     if (listener_ < 0) fail("socket");
     try {
+        if (::fcntl(listener_, F_SETFD, FD_CLOEXEC) < 0) fail("fcntl listener");
         // bind refuses pre-existing files; never unlink a path that we did not create.
         if (::bind(listener_, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) fail("bind");
         bound_ = true;
@@ -119,13 +121,22 @@ UnixSocket::UnixSocket(int connected_fd) : client_(connected_fd) {
     }
 }
 
+bool UnixSocket::client_pending(int timeout_ms) {
+    pollfd descriptor {listener_, POLLIN, 0};
+    int result;
+    do { result = ::poll(&descriptor, 1, timeout_ms); } while (result < 0 && errno == EINTR);
+    if (result < 0) fail("poll listener");
+    return result > 0;
+}
+
 void UnixSocket::accept_client() {
     // One client owns the instance; disconnect terminates this service session.
     if (client_ < 0) {
         do { client_ = ::accept(listener_, nullptr, nullptr); } while (client_ < 0 && errno == EINTR);
     }
     if (client_ < 0) fail("accept");
-    timeval timeout {30, 0};
+    if (::fcntl(client_, F_SETFD, FD_CLOEXEC) < 0) fail("fcntl client");
+    timeval timeout {0, 0};
     if (::setsockopt(client_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0 ||
         ::setsockopt(client_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0)
         fail("setsockopt timeout");

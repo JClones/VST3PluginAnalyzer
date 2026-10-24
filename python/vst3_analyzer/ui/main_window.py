@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: MIT
 """Main measurement window with live plots, compact menus and an independent parameter editor."""
 import math
+import time
 from dataclasses import replace
 import sys
 import logging
 from pathlib import Path
 from PySide6.QtCore import QByteArray, QEvent, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QFont, QGuiApplication, QKeySequence
-from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMainWindow, QMessageBox, QWidget
+from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMainWindow, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 
 from .branding import application_icon
 from .native_menu import clear_native_hide_shortcut
@@ -26,7 +27,7 @@ from ..measurements.modes import GENERATORS, MEASUREMENTS
 class MainWindow(QMainWindow):
     """Keep widgets responsive while the worker continuously drives the selected VST3 effect."""
 
-    def __init__(self, executable, settings=MeasurementSettings(), transport="socketpair", parent=None, session=None):
+    def __init__(self, executable, settings=MeasurementSettings(), transport="socketpair", parent=None, session=None, endpoint=None, host_pid=None):
         """Build the analyzer shell and start an idle host worker."""
         super().__init__(parent)
         settings = replace(settings, precision="auto")  # Desktop processing always negotiates native precision.
@@ -55,12 +56,29 @@ class MainWindow(QMainWindow):
         self.last_export_directory = ""  # Most recent successful plot-export directory.
         self.last_preset_directory = ""  # Location shared by preset import and export dialogs.
         self.bypass_parameter_id = None  # Writable VST3 kIsBypass parameter, if the loaded effect exposes one.
-        self.worker = AnalyzerWorker(executable, settings, transport, self)  # Sole native IPC owner.
+        self.worker = AnalyzerWorker(executable, settings, transport, self, endpoint=endpoint, host_pid=host_pid)  # Sole native IPC owner.
         self.spectrum = SpectrumView()  # Large central FFT canvas.
         self.spectrum.set_measurement("frequency")  # New sessions start with Frequency Response.
         self.spectrum.set_sample_rate(settings.sample_rate, settings.fft_size)
         self.spectrum.reset_view()
-        self.setCentralWidget(self.spectrum)
+        central = QWidget(self)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.request_banner = QWidget(central)
+        banner_layout = QHBoxLayout(self.request_banner)
+        banner_layout.addWidget(QLabel("The plugin is taking longer than expected to respond."))
+        self.exit_button = QPushButton("Exit application")
+        self.exit_button.clicked.connect(self.worker.abort)
+        banner_layout.addWidget(self.exit_button)
+        self.request_banner.hide()
+        layout.addWidget(self.request_banner)
+        layout.addWidget(self.spectrum)
+        self.setCentralWidget(central)
+        self.request_timer = QTimer(self)
+        self.request_timer.setInterval(100)
+        self.request_timer.timeout.connect(self._check_request_wait)
+        self.request_timer.start()
         self.parameter_window = ParameterWindow(self)  # Independent scrollable parameter editor.
         self.parameters = self.parameter_window.table  # Parameter rows shared with UI/session helpers.
         self.parameter_rows = self.parameter_window.rows  # Stable internal IDs for control lookup.
@@ -90,6 +108,28 @@ class MainWindow(QMainWindow):
         QApplication.instance().applicationStateChanged.connect(self._application_state_changed)
         self.worker.start()
         QTimer.singleShot(0, self._reserve_harmonic_menu_shortcut)
+
+    def _dismiss_modal(self):
+        """Keep an application-wide wait or exit reachable during a modal operation."""
+        modal = QApplication.activeModalWidget()
+        owner = modal
+        # QWidget.isAncestorOf excludes independent dialog windows; follow QObject ownership.
+        while owner is not None and owner is not self:
+            owner = owner.parent()
+        if owner is self and hasattr(modal, "reject"):
+            modal.reject()
+
+    def _check_request_wait(self):
+        """Observe the worker without adding a thread for every audio request."""
+        client = self.worker.client
+        started = client.request_started if client is not None else None
+        self._request_slow(started is not None and time.monotonic() - started >= 10.0)
+
+    def _request_slow(self, visible):
+        """Show the inline wait warning without allowing a dialog to block its Exit button."""
+        if visible:
+            self._dismiss_modal()
+        self.request_banner.setVisible(visible)
 
     def _reserve_harmonic_menu_shortcut(self):
         """Free the native Hide shortcut and synchronize its visible measurement replacement."""
@@ -692,7 +732,8 @@ class MainWindow(QMainWindow):
             if self.session is not None:
                 self.session.update_ui(self._ui_snapshot())
             self.worker.stop()
-            self.setEnabled(False)
+            self.menuBar().setEnabled(False)
+            self.parameter_window.setEnabled(False)
             event.ignore()
         else:
             if self.session is not None and not self.session_finished:
@@ -712,6 +753,7 @@ class MainWindow(QMainWindow):
         """Finish a previously requested close after worker-owned resources are released."""
         # Avoid deleting a still-running QThread or its child-process owner.
         if self.worker.stop_requested.is_set():
+            self._dismiss_modal()
             QTimer.singleShot(0, self.close)
 
     def _shutdown_saved(self, result):

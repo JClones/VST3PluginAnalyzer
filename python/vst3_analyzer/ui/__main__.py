@@ -17,6 +17,8 @@ def main(argv=None):
     """Start the GUI, optionally preloading an explicit plugin class."""
     # Keep desktop dependencies optional for headless measurement and protocol users.
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--connect-socket", help=argparse.SUPPRESS)
+    parser.add_argument("--host-pid", type=int, help=argparse.SUPPRESS)
     parser.add_argument("--host", default=str(default_host_executable()))
     parser.add_argument("--transport", choices=("socketpair", "named"), default="socketpair")
     parser.add_argument("plugin_path", nargs="?", metavar="PLUGIN", help="Optional VST3 plugin path to load at startup")
@@ -45,7 +47,8 @@ def main(argv=None):
         settings = MeasurementSettings.load(args.settings) if args.settings else MeasurementSettings.from_dict(stored_settings)
     except (OSError, RuntimeError, ValueError, TypeError) as error:
         parser.exit(1, f"Could not initialize session: {error}\n")
-    window = MainWindow(str(Path(args.host).resolve()), settings, args.transport, session=session)
+    window = MainWindow(str(Path(args.host).resolve()), settings, args.transport, session=session,
+                        endpoint=args.connect_socket, host_pid=args.host_pid)
     window.show()
     if args.plugin:
         if args.set:

@@ -8,7 +8,10 @@ import sys
 
 # Source/native-host tar distributions use the system interpreter and adjacent sources.
 if not getattr(sys, "frozen", False):
-    sys.path.insert(0, str(Path(__file__).resolve().parent / "python"))
+    root = Path(__file__).resolve().parent
+    if not (root / "python/vst3_analyzer").is_dir() and (root.parent.parent / "python/vst3_analyzer").is_dir():
+        root = root.parent.parent
+    sys.path.insert(0, str(root / "python"))
 
 from vst3_analyzer.ui.__main__ import main
 

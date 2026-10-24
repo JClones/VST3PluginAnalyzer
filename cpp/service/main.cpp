@@ -7,6 +7,7 @@
 #include "host/plugin_host.h"
 #include "host/native_editor.h"
 #include "ipc/unix_socket.h"
+#include "ui_launcher.h"
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -395,7 +396,7 @@ private:
             result.AddMember("sample_format", "f64le", allocator);
             result.AddMember("layout", "planar", allocator);
             result.AddMember("latency_samples", host_.latency(), allocator);
-        } else if (command == "shutdown") {
+        } else if (command == "shutdown" || command == "exit") {
             // Terminate the plugin before acknowledging a clean service shutdown.
             host_.unload();
             stopping_ = true;
@@ -418,38 +419,55 @@ private:
  */
 int main(int argc, char** argv) {
     try {
-        // The parent chooses a short socket path inside its own private directory.
-        if (argc != 3) {
-            std::cerr << "Usage: vst3-host-service --socket PATH | --socket-fd FD\n";
-            return 2;
-        }
         std::signal(SIGPIPE, SIG_IGN);
+        std::unique_ptr<analyzer::UILauncher> ui;
         std::unique_ptr<analyzer::ipc::UnixSocket> socket;
-        if (std::string(argv[1]) == "--socket") {
-            socket = std::make_unique<analyzer::ipc::UnixSocket>(argv[2]);
-        } else if (std::string(argv[1]) == "--socket-fd") {
-            std::size_t end = 0;
-            const auto descriptor = std::stoi(argv[2], &end);
-            if (end != std::string(argv[2]).size()) throw std::invalid_argument("Invalid descriptor");
-            socket = std::make_unique<analyzer::ipc::UnixSocket>(descriptor);
+        const std::string option = argc > 1 ? argv[1] : "";
+        if (option == "--socket" || option == "--socket-fd") {
+            if (argc != 3) throw std::invalid_argument("Service options require exactly one argument");
+            if (option == "--socket") {
+                socket = std::make_unique<analyzer::ipc::UnixSocket>(argv[2]);
+            } else {
+                std::size_t end = 0;
+                const auto descriptor = std::stoi(argv[2], &end);
+                if (end != std::string(argv[2]).size()) throw std::invalid_argument("Invalid descriptor");
+                socket = std::make_unique<analyzer::ipc::UnixSocket>(descriptor);
+            }
         } else {
-            throw std::invalid_argument("Unknown service option");
+            ui = std::make_unique<analyzer::UILauncher>();
+            socket = std::make_unique<analyzer::ipc::UnixSocket>(ui->socket_path());
+            ui->start(argc, argv);
+            while (!socket->client_pending(50)) {
+                if (!ui->running()) return ui->wait();
+            }
         }
         socket->accept_client();
-        Session session;
-        wire::Frame frame;
+        wire::Frame final_response;
+        bool clean_shutdown = false;
+        {
+            Session session;
+            wire::Frame frame;
 
-        // UI callbacks, control commands and audio remain serialized on the native main thread.
-        while (true) {
-            analyzer::pump_editor_events();
-            if (!socket->readable(5)) continue;
-            if (!socket->receive(frame)) break;
-            socket->send(session.handle(frame));
-            if (session.stopping()) break;
+            // UI callbacks, control commands and audio remain serialized on the native main thread.
+            while (true) {
+                analyzer::pump_editor_events();
+                if (!socket->readable(5)) continue;
+                if (!socket->receive(frame)) break;
+                auto response = session.handle(frame);
+                if (session.stopping()) {
+                    final_response = std::move(response);
+                    clean_shutdown = true;
+                    break;
+                }
+                socket->send(response);
+            }
         }
-        return 0;
+        // Acknowledge only after all plugin/session destruction succeeds.
+        if (clean_shutdown) socket->send(final_response);
+        socket.reset();
+        return ui ? ui->wait() : 0;
     } catch (const std::exception& error) {
-        // Unrecoverable transport failures end the instance; Python can launch a fresh service.
+        // Unrecoverable transport failures end the entire application instance.
         std::cerr << "Service error: " << error.what() << '\n';
         return 1;
     }

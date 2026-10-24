@@ -58,7 +58,7 @@ def package(version, host, output):
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.pyo', 'README.md'))
     # Only the native host is compiled; Python and third-party dependencies are external.
     copy(host, tar_runtime / 'native/vst3-host-service')
-    copy(ASSETS / 'source-launcher.sh', tar_runtime / NAME)
+    (tar_runtime / NAME).symlink_to('native/vst3-host-service')
     copy(ASSETS / 'check-dependencies.py', tar_runtime / 'check-dependencies.py')
     copy(ASSETS / 'runtime-requirements.txt', tar_runtime / 'requirements.txt')
     copy(PROJECT / 'packaging/common/entrypoint.py', tar_runtime / 'entrypoint.py')

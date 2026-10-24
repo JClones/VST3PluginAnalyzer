@@ -32,6 +32,8 @@ public:
     UnixSocket& operator=(const UnixSocket& other) = delete; ///< No implicit descriptor copies.
     /** Accept one client and apply bounded read/write timeouts. */
     void accept_client();
+    /** Poll the listener while monitoring the host-first UI child. */
+    bool client_pending(int timeout_ms);
     /** Wait at most a bounded interval for frame data or disconnection.
      * @param timeout_ms Maximum poll wait in milliseconds; zero checks immediately and -1 waits indefinitely.
      */

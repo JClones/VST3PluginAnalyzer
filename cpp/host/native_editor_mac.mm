@@ -117,9 +117,9 @@ public:
         // Drain activation notifications before evaluating an IPC request from the newly active Python parent.
         pump_editor_events();
         const auto foreground = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
-        if (foreground != getppid()) return;
+        if (foreground != analyzer_ui_pid()) return;
         // Switching from our editor to the analyzer must leave the analyzer in front.
-        if (active_process_ == getppid() && previous_process_ == getpid()) return;
+        if (active_process_ == analyzer_ui_pid() && previous_process_ == getpid()) return;
         // The editor lives in a separate process; ordering alone must not activate that application.
         if (window_.visible) [window_ orderFrontRegardless];
     }

@@ -81,7 +81,7 @@ def sign_bundle(bundle, identity):
     # Use explicit inside-out signing so the host entitlement never spreads to Python or Qt.
     for target in signing_targets(bundle):
         command = ["codesign", "--force", "--sign", identity, "--options", "runtime", "--timestamp"]
-        if target == host:
+        if target == host or target == bundle or target == bundle / "Contents/MacOS/VST3 Plugin Analyzer":
             command.extend(["--entitlements", PROJECT / "packaging/macos/host.entitlements.plist"])
         run([*command, target])
     run(["codesign", "--verify", "--deep", "--strict", "--verbose=2", bundle])

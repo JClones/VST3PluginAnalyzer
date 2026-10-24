@@ -189,7 +189,7 @@ public:
     /** Raise an already visible editor without changing keyboard focus. */
     void raise() override {
         track_activation();
-        if (!visible_ || (active_pid_ && active_pid_ != getppid()) || previous_pid_ == getpid()) return;
+        if (!visible_ || (active_pid_ && active_pid_ != analyzer_ui_pid()) || previous_pid_ == getpid()) return;
         raise_window();
     }
     /** Hide the retained editor, preserving the embedded plugin view. */
@@ -281,7 +281,7 @@ private:
     /** Associate the two processes' windows so window managers permit an in-application raise. */
     void group_with_analyzer() {
         const auto active = property_word(root_, active_window_, XA_WINDOW);
-        if (!active || property_word(active, pid_atom_, XA_CARDINAL) != static_cast<unsigned long>(getppid())) return;
+        if (!active || property_word(active, pid_atom_, XA_CARDINAL) != static_cast<unsigned long>(analyzer_ui_pid())) return;
         auto leader = property_word(active, leader_atom_, XA_WINDOW);
         if (!leader) leader = active;
         if (leader == group_leader_) return;
@@ -396,7 +396,7 @@ private:
             active_pid_ = pid;
             // Qt can announce activation before the root property changes. Handle that later
             // property notification here as well, rather than losing the early IPC request.
-            if (visible_ && active_pid_ == getppid() && previous_pid_ != getpid()) raise_window();
+            if (visible_ && active_pid_ == analyzer_ui_pid() && previous_pid_ != getpid()) raise_window();
         }
     }
     IPtr<IPlugView> view_; ///< Retained plugin view, detached before module unloading.

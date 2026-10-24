@@ -11,7 +11,7 @@ import time
 from PySide6.QtCore import QThread, Signal
 
 from ..dut.vst3 import VST3DUT
-from ..ipc.client import HostClient, HostError
+from ..ipc.client import HostClient, HostError, HostDisconnected
 from ..measurements.live import LiveAnalyzer, RealtimePacer
 from ..settings import MeasurementSettings
 from .presets import discover_presets, validate_preset
@@ -35,10 +35,14 @@ class AnalyzerWorker(QThread):
     cleared = Signal()  # Old plugin state is no longer usable.
     performance_update = Signal(object)  # Native timing entries, completion or failure for the dedicated log window.
 
-    def __init__(self, executable, settings=MeasurementSettings(), transport="socketpair", parent=None):
+    def __init__(self, executable, settings=MeasurementSettings(), transport="socketpair", parent=None, endpoint=None, host_pid=None):
         """Store immutable startup settings and initialize thread-safe command/frame handoffs."""
         super().__init__(parent)
         # Only run() creates and uses the service client.
+        self.endpoint = endpoint
+        self.host_pid = host_pid
+        self.client = None
+        self.forced = False
         self.executable = executable  # Native service path.
         self.ms_mode = False  # Select paired M/S excitation or continuous output decoding.
         self.measurement = "frequency"  # Initial desktop mode; saved sessions can override it.
@@ -59,9 +63,16 @@ class AnalyzerWorker(QThread):
 
     def stop(self):
         """Request cooperative shutdown and interrupt an idle/pacing wait."""
-        # Native socket timeouts bound shutdown if a plugin is currently unresponsive.
+        # The GUI remains responsive and can force exit while a native request is blocked.
         self.stop_requested.set()
         self.wake.set()
+
+    def abort(self):
+        """Force a dirty exit without waiting for the serialized worker request."""
+        self.forced = True
+        self.stop()
+        if self.client is not None:
+            self.client.abort()
 
     def take_frame(self):
         """Transfer the latest spectrum to the GUI, dropping superseded intermediate frames."""
@@ -88,7 +99,9 @@ class AnalyzerWorker(QThread):
 
     def run(self):
         """Own the host lifetime, drain controls and process blocks at the selected sample rate."""
-        client = HostClient(self.executable, timeout=2.0, initialization_timeout=30.0, transport=self.transport)
+        client = HostClient(self.executable, timeout=2.0, initialization_timeout=30.0, transport=self.transport, endpoint=self.endpoint, host_pid=self.host_pid,
+                            wait_forever=True)
+        self.client = client
         dut = VST3DUT(client)
         stream = pacer = None
         active_plugin = None
@@ -98,12 +111,14 @@ class AnalyzerWorker(QThread):
         rate_start = 0.0  # Wall-clock start of the current paced stream.
         performance_active = False  # Live acquisition pauses until the performance window closes.
         try:
-            # Startup failures remain visible while the GUI can request another load/restart.
+            # The interface and native host share one lifetime; startup failures end both.
             try:
                 client.start()
                 self.status.emit("Ready — load a VST3 effect")
             except Exception as error:
-                self.error.emit(str(error))
+                unsafe = True
+                self.stop_requested.set()
+                self.status.emit(str(error))
             while not self.stop_requested.is_set() or not self.commands.empty() or pending_exports:
                 self.wake.clear()
                 for _ in range(0 if pending_exports else 64):
@@ -113,7 +128,7 @@ class AnalyzerWorker(QThread):
                         break
                     try:
                         if not client.capabilities:
-                            client.start()
+                            raise HostDisconnected("The application host has exited")
                         if operation == "classes":
                             classes = client.request("list_classes", path=values["path"])["classes"]
                             self.classes_ready.emit({"path": values["path"], "classes": classes})
@@ -244,6 +259,11 @@ class AnalyzerWorker(QThread):
                             active_plugin = None
                             self.cleared.emit()
                             self.status.emit("Ready — load a VST3 effect")
+                    except HostDisconnected as error:
+                        unsafe = True
+                        self.stop_requested.set()
+                        self.status.emit(str(error))
+                        break
                     except HostError as error:
                         # A rejected parameter edit can leave the existing stream healthy.
                         if operation not in ("parameter", "program", "export_preset", "editor"):
@@ -267,6 +287,13 @@ class AnalyzerWorker(QThread):
                     if self.commands.empty():
                         break
                     continue
+                try:
+                    client.check_alive()
+                except (HostDisconnected, OSError) as error:
+                    unsafe = True
+                    self.stop_requested.set()
+                    self.status.emit(str(error))
+                    break
                 if stream is None or performance_active:
                     self.wake.wait(0.05)
                     continue
@@ -311,12 +338,16 @@ class AnalyzerWorker(QThread):
                     unsafe = True
                     stream = pacer = None
                     self.cleared.emit()
-                    self.error.emit(str(error))
+                    if isinstance(error, HostDisconnected):
+                        self.stop_requested.set()
+                        self.status.emit(str(error))
+                    else:
+                        self.error.emit(str(error))
         finally:
             # Deliver queued final edits before reading processor state; this is only an exit snapshot.
             snapshot = None
             try:
-                if active_plugin is not None:
+                if active_plugin is not None and not unsafe and not self.forced:
                     if stream is None:
                         raise RuntimeError("Plugin is not in a saveable processing state")
                     stream.step()
@@ -328,9 +359,12 @@ class AnalyzerWorker(QThread):
                             snapshot["preset"] = self.preset_path.name
                         except HostError as error:
                             # Plugins without getState still retain editable parameters as a fallback.
-                            self.error.emit(f"Preset unavailable; retaining parameters: {error}")
+                            unsafe = True
+                            self.status.emit(f"Could not save plugin state: {error}")
             except Exception as error:
                 unsafe = True
-                self.error.emit(f"Could not capture plugin state: {error}")
-            clean = client.close() and not unsafe
+                self.status.emit(f"Could not capture plugin state: {error}")
+            if unsafe or self.forced:
+                client.abort()
+            clean = client.close() and not unsafe and not self.forced
             self.shutdown_saved.emit({"plugin": snapshot, "clean": clean})

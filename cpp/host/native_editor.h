@@ -5,11 +5,19 @@
  * @brief Platform-neutral native editor window interface and persisted visibility, position and content-size data.
  */
 #pragma once
+#include <cstdlib>
+#include <unistd.h>
 #include <memory>
 #include <string>
 namespace Steinberg { class IPlugView; }
 
 namespace analyzer {
+/** UI may be the host's child (normal launch) or parent (UI-first mode). */
+inline pid_t analyzer_ui_pid() {
+    const auto value = std::getenv("VST3_ANALYZER_UI_PID");
+    return value ? static_cast<pid_t>(std::strtol(value, nullptr, 10)) : ::getppid();
+}
+
 /** Native editor appearance saved separately from the plugin's audio/controller preset. */
 struct EditorState {
     bool visible = false; ///< Whether the native editor is currently shown.
