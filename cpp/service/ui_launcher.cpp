@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <signal.h>
 #include <spawn.h>
 #include <stdexcept>
 #include <sys/wait.h>
