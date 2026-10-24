@@ -9,6 +9,16 @@ with THD and THD+N; view impulse responses; and compare stereo or Mid/Side
 results. Open the plugin's own editor or the analyzer's parameter list, save
 VST3 presets, and export plots as PNG, SVG or CSV.
 
+## Differences from the original VST Plugin Analyzer
+
+Compared with Christian Budde's original Windows application for 32-bit VST2
+plugins, this analyzer supports 64-bit VST3 plugins on Linux and macOS, including
+64-bit floating point audio input/output when supported by the plugin. Measurement
+algorithms and the interface are implemented in Python, while the plugin runs in
+a separate C++ host process. The plugin editor window belongs to that host:
+closing it does not exit VST3 Plugin Analyzer. Use **Window → Default Editor**
+(**F2**) to show the editor again.
+
 ## Compatibility and limitations
 
 | Platform | Requirements |
@@ -46,7 +56,7 @@ Your saved settings and separately installed plugins are retained.
 Open a terminal in the directory containing the downloaded file:
 
 ```sh
-sudo apt install ./vst3-plugin-analyzer_0.1.0_amd64.deb
+sudo apt install ./vst3-plugin-analyzer_0.2.0_amd64.deb
 ```
 
 APT installs the required Python, PySide6, NumPy and pyqtgraph packages from your
@@ -63,7 +73,7 @@ sudo apt remove vst3-plugin-analyzer
 ### Fedora: RPM package
 
 ```sh
-sudo dnf install ./vst3-plugin-analyzer-0.1.0-1.x86_64.rpm
+sudo dnf install ./vst3-plugin-analyzer-0.2.0-1.x86_64.rpm
 ```
 
 DNF installs the required dependencies automatically. Fedora 44 has been checked.
@@ -83,8 +93,8 @@ replacing an installed package with another build of the same version, use
 The tar archive contains the application files and installation/uninstallation scripts.
 
 ```sh
-tar -xzf vst3-plugin-analyzer-0.1.0-linux-x86_64.tar.gz
-cd vst3-plugin-analyzer-0.1.0-linux-x86_64
+tar -xzf vst3-plugin-analyzer-0.2.0-linux-x86_64.tar.gz
+cd vst3-plugin-analyzer-0.2.0-linux-x86_64
 ```
 
 Install for your account:
@@ -289,11 +299,41 @@ can also keep waiting indefinitely. The line disappears when the request complet
 A normal close saves plugin state and waits for shutdown; forced exits skip
 automatic plugin loading on the next launch.
 
-For plugin debugging, launch the native executable directly under your IDE's
-debugger. It starts the interface automatically. See the [debugging guide](docs/debugging.md).
-
 When reporting a problem, include the
 analyzer version, OS, CPU architecture, plugin name/version and steps to reproduce.
+
+## Debugging plugins
+
+Launch the analyzer under a debugger and pass the VST3 plugin path as an argument.
+The native host starts the interface automatically, allowing you to debug plugin
+loading and processing without attaching to another process. Enter `run` at the
+debugger prompt to start the application.
+
+**Linux:**
+
+```sh
+gdb --args /usr/local/bin/vst3-plugin-analyzer <vst3 plugin path>
+```
+
+Example:
+
+```sh
+gdb --args /usr/local/bin/vst3-plugin-analyzer ~/.vst3/TDR\ Nova.vst3
+```
+
+**macOS:**
+
+```sh
+lldb /Applications/VST3\ Plugin\ Analyzer.app -- <vst3 plugin path>
+```
+
+Example:
+
+```sh
+lldb /Applications/VST3\ Plugin\ Analyzer.app -- /Library/Audio/Plug-Ins/VST3/TDR\ Nova.vst3
+```
+
+See the [debugging guide](docs/debugging.md) for IDE setup and custom UI locations.
 
 ## License and credits
 

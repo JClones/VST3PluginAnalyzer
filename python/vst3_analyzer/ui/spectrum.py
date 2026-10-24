@@ -321,7 +321,7 @@ class SpectrumView(QWidget):
         box.zoom_touchpad(factor, box.viewRect().center(), modifiers)
 
     def zoom_full(self, fft_size):
-        """Show every non-DC FFT bin and all finite plotted Y values.
+        """Fit non-DC FFT bins and finite Y values, with a -200 dB harmonic floor.
 
         Args:
             fft_size: Current measurement record length, used to locate FFT bin one.
@@ -354,6 +354,8 @@ class SpectrumView(QWidget):
                 finite.append((float(values.min()), float(values.max())))
         if finite:
             minimum = min(item[0] for item in finite)
+            if self.measurement == "harmonic":
+                minimum = max(minimum, -200.0)
             maximum = max(item[1] for item in finite)
             if maximum - minimum >= high - low:
                 low, high = minimum, maximum
@@ -370,6 +372,9 @@ class SpectrumView(QWidget):
             margin = (high - low) * stroke_margin / (height - 2 * stroke_margin)
             low = min(low, minimum - margin)
             high = max(high, maximum + margin)
+        if self.measurement == "harmonic":
+            # Numerical FFT residuals and stroke padding must not push Full below its display floor.
+            low = max(low, -200.0)
         self.plot.getViewBox().setRange(xRange=x_range, yRange=(low, high), padding=0)
 
     def reset_view(self):
