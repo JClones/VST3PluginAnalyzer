@@ -1,7 +1,7 @@
 # Copyright (c) 2026 vladg/sound
 # SPDX-License-Identifier: MIT
 cmake_minimum_required(VERSION 3.25)
-project(VST3PluginAnalyzer VERSION 0.2.0 LANGUAGES CXX)
+project(VST3PluginAnalyzer VERSION 0.2.1 LANGUAGES CXX)
 
 # Enable Objective-C++ before the SDK creates targets containing native macOS sources.
 if(APPLE)

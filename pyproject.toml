@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vst3-plugin-analyzer"
-version = "0.2.0"
+version = "0.2.1"
 description = "Offline VST3 measurements with a separate native host"
 readme = "README.md"
 license = "MIT"

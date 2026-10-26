@@ -146,7 +146,7 @@ def main():
             return
         # Discover the version before changing signatures; no project packages are required.
         with (bundle / "Contents/Info.plist").open("rb") as stream:
-            version = plistlib.load(stream).get("CFBundleShortVersionString", "0.2.0")
+            version = plistlib.load(stream).get("CFBundleShortVersionString", "0.2.1")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", version):
             raise RuntimeError("The bundle version cannot be used in a release filename")
         identity, label = select_identity(args.identity)
