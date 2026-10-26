@@ -9,8 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QLinearGradient
 
 from .phase_curve import wrapped_phase_paths
-from .plot_strokes import register_stroke
-from ..measurements.modes import SPECTRUM_MODES
+from .plot_strokes import register_stroke, set_curve_rendering
 
 TRACE_COLORS = ("#ff00ff", "#0000f5", "#ea3323")  # Linked/mono, left and right colors shared by live and stored traces.
 STORED_CURVE_OPACITY = 0.5  # Half-transparent main strokes; wrap connectors retain their additional attenuation.
@@ -103,7 +102,7 @@ def add_stored_curve(plot, x, y, pen, measurement, connect="finite"):
     curve.setProperty("storedColor", color.name())  # Keep each channel tint intact when its fade is refreshed.
     curve.setProperty("storedAlpha", color.alpha())
     curve.setDynamicRangeLimit(2.0, hysteresis=1.0)
-    curve.curve.setSegmentedLineMode("on" if measurement in SPECTRUM_MODES else "off")
+    set_curve_rendering(curve, y, measurement)
     fade_stored_curve(curve, *plot.getViewBox().viewRange()[0])
     return curve
 

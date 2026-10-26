@@ -16,7 +16,7 @@ from .phase_curve import wrapped_phase_paths
 from .plot_export import ExportTrace
 from .plot_cursor import PlotCursor
 from .navigation import AnalyzerPlotWidget, AnalyzerViewBox
-from .plot_strokes import register_stroke
+from .plot_strokes import register_stroke, set_curve_rendering
 from ..dsp.distortion import combine_distortion
 from ..dsp.response import relative_response
 from ..measurements.modes import GENERATORS, MEASUREMENTS, SPECTRUM_MODES
@@ -173,8 +173,7 @@ class SpectrumView(QWidget):
         self.measurement = measurement
         self._update_horizontal_axis()
         self._update_vertical_axis()
-        # Draw response bins as one antialiased path, avoiding seams between independent thick segments.
-        # Retain segmented rendering for the much taller, dense harmonic spectra to keep redraws responsive.
+        # Smooth responses use joined paths; show_frame selects fast segments for jagged spectra.
         for curve in (self.linked, self.left, self.right):
             curve.curve.setSegmentedLineMode("on" if measurement in SPECTRUM_MODES else "off")
         self.clear(reset_comparisons=False)
@@ -547,6 +546,7 @@ class SpectrumView(QWidget):
             (self.right, self.wrap_connections[2], amplitudes[1]))
         wrapped = self.measurement == "frequency" and self.response_view == "wrapped"
         for curve, overlay, values in active:
+            set_curve_rendering(curve, values, self.measurement)
             if wrapped:
                 # Draw every interpolated wrap segment faintly, including the legs to the phase boundaries.
                 solid_x, solid_y, connector_x, connector_y = wrapped_phase_paths(frequency, values)
