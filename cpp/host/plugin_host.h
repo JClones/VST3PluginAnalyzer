@@ -55,10 +55,10 @@ struct Bus {
 /** Channel-major float64 transport audio, with equally sized channels. */
 using Audio = std::vector<std::vector<double>>;
 
-/** Native DSP timing for one second of input, excluding generation, routing and IPC. */
+/** Native DSP timing for one second rounded up to full blocks, excluding generation, routing and IPC. */
 struct PerformanceResult {
-    std::uint32_t samples; ///< Rounded configured sample rate: number of samples processed per channel.
-    std::uint32_t blocks; ///< Number of native processing callbacks, including a final partial block.
+    std::uint32_t samples; ///< Nominal one-second sample count for display, excluding the rounded-up processing tail.
+    std::uint32_t blocks; ///< Number of full-sized native processing callbacks.
     double processing_ms; ///< Sum of monotonic-clock durations around IAudioProcessor::process(), in milliseconds.
 };
 
@@ -162,7 +162,7 @@ public:
      */
     Audio process(const Audio& input, double* processing_ms = nullptr);
 
-    /** Time one second of audio on the currently configured instance without reconfiguration.
+    /** Time one second rounded up to full processing blocks without reconfiguration.
      * @param stimulus Either "noise" for independent uniform stereo noise or "impulse" for one unit impulse then zeros.
      */
     PerformanceResult performance(const std::string& stimulus);

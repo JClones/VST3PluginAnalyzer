@@ -687,7 +687,10 @@ PerformanceResult PluginHost::performance(const std::string& stimulus) {
     if (stimulus != "noise" && stimulus != "impulse")
         throw std::invalid_argument("Performance stimulus must be noise or impulse");
     const auto samples = static_cast<std::uint32_t>(std::llround(s.sample_rate));
-    Audio input(s.channel_count, std::vector<double>(samples, 0.0));
+    const auto blocks = (samples + s.block_size - 1) / s.block_size;
+    const auto processing_samples = blocks * s.block_size;
+    // Benchmark full processing blocks, while reporting the nominal one-second sample count.
+    Audio input(s.channel_count, std::vector<double>(processing_samples, 0.0));
     if (stimulus == "noise") {
         // Signal generation is outside the timed DSP calls; sequential draws give uncorrelated stereo inputs.
         std::mt19937_64 random(std::random_device{}());
@@ -695,12 +698,12 @@ PerformanceResult PluginHost::performance(const std::string& stimulus) {
         for (auto& channel : input)
             for (auto& sample : channel) sample = distribution(random);
     } else {
-        // Each channel receives one unit impulse and samples-1 zeros, not an impulse train.
+        // Each channel receives one unit impulse followed by zeros, including the rounded-up tail.
         for (auto& channel : input) channel.front() = 1.0;
     }
     double milliseconds = 0.0;
     process(input, &milliseconds);
-    return {samples, static_cast<std::uint32_t>((samples + s.block_size - 1) / s.block_size), milliseconds};
+    return {samples, static_cast<std::uint32_t>(blocks), milliseconds};
 }
 
 PrecisionSupport PluginHost::precision_support() const {
