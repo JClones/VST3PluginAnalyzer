@@ -1,0 +1,24 @@
+# VST3 Plugin Analyzer v0.3.0 — Measurement and workflow improvements
+
+Frequency-response measurements now retain pre-ringing and the impulse tail during
+recovery, improving magnitude, phase and group-delay accuracy for plugins with
+reported latency. Group delay is calculated directly from the captured impulse
+response with latency compensation.
+
+- Added a configurable **Phase calculation threshold** in Settings. Phase and
+  group delay below the threshold are omitted at the response edges; bounded gaps
+  use dashed interpolation. Magnitude measurements remain available below it.
+- Extended **M/S Mode** with **Interleaved**, **Left only** and **Right only**
+  excitation options.
+- Closing the plugin editor now destroys its window and view; reopening creates
+  a fresh editor.
+- Added units to values in the F3 parameter window. Values select automatically
+  on focus, and background refreshes preserve selection and unfinished edits.
+- FFT size is now selected from powers of two between 1024 and 65536.
+- Improved phase grid spacing and reordered the Plugin and Plot menus.
+
+## Brief description
+
+Improved frequency-response accuracy with complete pre-ringing capture, direct
+group-delay analysis, configurable phase thresholds, new M/S modes, and smoother
+parameter editing.

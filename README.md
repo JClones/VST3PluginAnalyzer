@@ -61,7 +61,7 @@ Your saved settings and separately installed plugins are retained.
 Open a terminal in the directory containing the downloaded file:
 
 ```sh
-sudo apt install ./vst3-plugin-analyzer_0.2.1_amd64.deb
+sudo apt install ./vst3-plugin-analyzer_0.3.0_amd64.deb
 ```
 
 APT installs the required Python, PySide6, NumPy and pyqtgraph packages from your
@@ -78,7 +78,7 @@ sudo apt remove vst3-plugin-analyzer
 ### Fedora: RPM package
 
 ```sh
-sudo dnf install ./vst3-plugin-analyzer-0.2.1-1.x86_64.rpm
+sudo dnf install ./vst3-plugin-analyzer-0.3.0-1.x86_64.rpm
 ```
 
 DNF installs the required dependencies automatically. Fedora 44 has been checked.
@@ -98,8 +98,8 @@ replacing an installed package with another build of the same version, use
 The tar archive contains the application files and installation/uninstallation scripts.
 
 ```sh
-tar -xzf vst3-plugin-analyzer-0.2.1-linux-x86_64.tar.gz
-cd vst3-plugin-analyzer-0.2.1-linux-x86_64
+tar -xzf vst3-plugin-analyzer-0.3.0-linux-x86_64.tar.gz
+cd vst3-plugin-analyzer-0.3.0-linux-x86_64
 ```
 
 Install for your account:
