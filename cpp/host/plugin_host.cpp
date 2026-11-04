@@ -148,7 +148,8 @@ struct PluginHost::Impl {
     IPtr<IEditController> controller; ///< Optional parameter controller.
     IPtr<IAudioProcessor> processor; ///< Processing interface on the component.
     PrecisionSupport precision {false, false}; ///< Capabilities queried only while the instance is initialized/inactive.
-    IPtr<IPlugView> editor_view; ///< Single retained editor view, reused by availability checks and native windows.
+    bool editor_available = false; ///< Cached support result; a closed editor retains no plugin view.
+    EditorState closed_editor_state; ///< Geometry retained without keeping a native window alive.
     bool editor_queried = false; ///< Whether optional editor availability has been queried for this instance.
     bool buses_configured = false; ///< Bus arrangements and activation were negotiated for this instance.
     IPtr<Handler> handler = owned(new Handler); ///< Controller callback lifetime owner.
@@ -246,7 +247,8 @@ void PluginHost::unload() noexcept {
     // Reverse the processing lifecycle before releasing interfaces and native code.
     auto& s = *impl_;
     s.editor.reset();
-    s.editor_view.reset();
+    s.editor_available = false;
+    s.closed_editor_state = {};
     s.editor_queried = s.buses_configured = false;
     s.precision = {false, false};
     if (s.processing) s.processor->setProcessing(false);
@@ -419,65 +421,71 @@ std::vector<Parameter> PluginHost::parameters() const {
 }
 
 bool PluginHost::has_editor() const {
-    // Some controllers own one shared UI backend: creating a throwaway view can blank the open editor.
     auto& s = *impl_;
     if (!s.controller || !native_editor_supported()) return false;
     if (!s.editor_queried) {
-        s.editor_view = owned(s.controller->createView(ViewType::kEditor));
+        // Probe once, then release the view. Never allocate a throwaway view while
+        // an editor is open: some controllers share their GUI backend between views.
+        const auto view = owned(s.controller->createView(ViewType::kEditor));
+        s.editor_available = native_editor_view_supported(view);
         s.editor_queried = true;
     }
-    return native_editor_view_supported(s.editor_view);
+    return s.editor_available;
 }
 
-/** Show or hide the plugin editor without changing audio processing.
- * @param visible True shows or raises the native editor; false hides an existing window.
+/** Open or destroy the plugin editor without changing audio processing.
+ * @param visible True creates or raises the native editor; false destroys the window and plugin view.
  */
 void PluginHost::show_editor(bool visible) {
-    // A retained hidden window avoids losing UI state on each toggle.
     auto& s = *impl_;
     if (!visible) {
-        if (s.editor) s.editor->hide();
+        if (s.editor) {
+            s.closed_editor_state = s.editor->state();
+            s.closed_editor_state.visible = false;
+            s.editor.reset();
+        }
         return;
     }
+    if (s.editor && s.editor->close_requested()) show_editor(false);
     if (!s.editor) {
         if (!s.controller) throw std::runtime_error("Plugin has no edit controller");
         if (!has_editor()) throw std::runtime_error("Plugin has no default editor");
-        s.editor = create_native_editor(s.editor_view, s.provider->getClassInfo().name());
+        const auto view = owned(s.controller->createView(ViewType::kEditor));
+        if (!native_editor_view_supported(view)) throw std::runtime_error("Plugin has no default editor");
+        s.editor = create_native_editor(view, s.provider->getClassInfo().name());
+        s.editor->restore(s.closed_editor_state);
     }
     s.editor->show();
 }
 
+/** Dispatch native callbacks, then destroy user-closed editors after their callback stack returns. */
+void PluginHost::pump_editor_events() {
+    analyzer::pump_editor_events();
+    if (impl_->editor && impl_->editor->close_requested()) show_editor(false);
+}
+
 /** Raise only an existing visible editor; never allocate or attach a view here. */
 void PluginHost::raise_editor() {
-    // Check authoritative native visibility so a delayed request cannot reopen a user-closed editor.
-    if (impl_->editor && impl_->editor->visible()) impl_->editor->raise();
+    if (impl_->editor && impl_->editor->visible() && !impl_->editor->close_requested()) impl_->editor->raise();
 }
 
 bool PluginHost::editor_visible() const {
-    // Native close-button actions remain observable through this state query.
-    return impl_->editor && impl_->editor->visible();
+    return impl_->editor && impl_->editor->visible() && !impl_->editor->close_requested();
 }
 
 EditorState PluginHost::editor_state() const {
-    // Query native geometry at capture time, rather than trusting the Python polling cache.
-    return impl_->editor ? impl_->editor->state() : EditorState {};
+    return impl_->editor ? impl_->editor->state() : impl_->closed_editor_state;
 }
 
-/** Restore editor appearance without briefly showing a saved hidden window.
- * @param state Saved visibility and optional native position/content size to restore.
- */
+/** Restore geometry, allocating a plugin view only when the editor should be open. */
 void PluginHost::restore_editor(const EditorState& state) {
-    // A saved hidden editor must be restored without briefly showing its window.
     auto& s = *impl_;
-    if (!s.editor && (state.visible || state.has_geometry)) {
-        if (!s.controller) throw std::runtime_error("Plugin has no edit controller");
-        if (!has_editor()) throw std::runtime_error("Plugin has no default editor");
-        s.editor = create_native_editor(s.editor_view, s.provider->getClassInfo().name());
-    }
-    if (s.editor) {
+    if (!state.visible) show_editor(false);
+    s.closed_editor_state = state;
+    s.closed_editor_state.visible = false;
+    if (state.visible) {
+        show_editor(true);
         s.editor->restore(state);
-        if (state.visible) s.editor->show();
-        else s.editor->hide();
     }
 }
 

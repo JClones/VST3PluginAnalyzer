@@ -41,6 +41,8 @@ public:
     virtual void hide() = 0;
     /** Report actual visibility, including native close-button actions. */
     virtual bool visible() const = 0;
+    /** Native close request, destroyed by the host after the platform callback returns. */
+    virtual bool close_requested() const = 0;
     /** Capture actual native position, content size and visibility. */
     virtual EditorState state() const = 0;
     /** Apply validated saved geometry without showing a hidden window.

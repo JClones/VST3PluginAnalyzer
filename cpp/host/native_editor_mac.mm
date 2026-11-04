@@ -123,9 +123,14 @@ public:
         // The editor lives in a separate process; ordering alone must not activate that application.
         if (window_.visible) [window_ orderFrontRegardless];
     }
-    /** Hide the editor while retaining all plugin view resources. */
+    /** Request destruction after Cocoa finishes invoking its delegate. */
+    void request_close() {
+        close_requested_ = true;
+        hide();
+    }
+    bool close_requested() const override { return close_requested_; }
+    /** Temporarily hide the shell while its owner arranges teardown. */
     void hide() override {
-        // The native close button uses this same non-destructive operation.
         [window_ orderOut:nil];
     }
     /** Query native visibility after either host commands or user window actions. */
@@ -195,6 +200,7 @@ private:
     IPtr<EditorFrame> frame_; ///< Host callback reference retained until SDK setFrame(nullptr).
     NSWindow* window_ = nil; ///< ARC-owned Cocoa parent window.
     AnalyzerEditorDelegate* delegate_ = nil; ///< ARC-owned resize/close callback delegate.
+    bool close_requested_ = false; ///< Cocoa close callback requests deferred host-owned destruction.
     bool attached_ = false; ///< Whether removed() is required during teardown.
     id activation_observer_ = nil; ///< Workspace observation token removed before editor destruction.
     pid_t active_process_ = 0; ///< Most recently activated application process observed by the workspace.
@@ -236,12 +242,12 @@ void pump_editor_events() {
 } // namespace analyzer
 
 @implementation AnalyzerEditorDelegate
-/** Treat the native close button as hide, retaining the reusable plugin view.
- * @param sender Cocoa window whose close button was pressed; the owning editor is hidden instead.
+/** Defer destruction until Cocoa finishes the native close callback.
+ * @param sender Cocoa window whose close button was pressed.
  */
 - (BOOL)windowShouldClose:(NSWindow*)sender {
     // Python observes visibility on its next polling cycle.
-    if (self.owner) self.owner->hide();
+    if (self.owner) self.owner->request_close();
     return NO;
 }
 /** Pass proposed user dimensions through the plugin's size constraints.

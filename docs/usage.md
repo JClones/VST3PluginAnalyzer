@@ -7,9 +7,11 @@ entries under **Recent**. **Unload** releases it. External sidechain inputs are
 silenced; the test signal is sent to the main input bus. **Soft Bypass** requests
 the plugin's own bypass parameter while processing continues, when supported.
 
-**Window → Default Editor** opens the plugin's native GUI. **Parameter List**
-opens the analyzer's floating, scrollable parameter controls. Enter logical values
-such as a frequency directly in the value field; the plugin interprets the text.
+**Window → Default Editor** (**F2**) opens or closes the plugin's native GUI.
+Closing it destroys the native window and plugin view; reopening constructs a
+fresh editor at the last window geometry while audio processing continues.
+**Parameter List** opens the analyzer's floating, scrollable parameter controls.
+Enter logical values such as a frequency directly in the value field; the plugin interprets the text.
 Double-click or Alt-click a slider to reset its declared default value. Two-state
 parameters use checkboxes. **Program → Load... / Export...** use `.vstpreset`
 files; factory programs appear below those commands when supplied by the plugin.
@@ -80,7 +82,7 @@ main/stored traces for the current view, or time/sample values in impulse mode.
 | Action | Shortcut |
 | --- | --- |
 | Load plugin | Cmd+O on macOS / Ctrl+O on Linux |
-| Show/hide Default Editor | F2 |
+| Open/close Default Editor | F2 |
 | Show/hide Parameter List | F3 |
 | Frequency Response | Cmd+F / Ctrl+F |
 | Harmonic Response | Cmd+H / Ctrl+H |

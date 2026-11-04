@@ -192,7 +192,13 @@ public:
         if (!visible_ || (active_pid_ && active_pid_ != analyzer_ui_pid()) || previous_pid_ == getpid()) return;
         raise_window();
     }
-    /** Hide the retained editor, preserving the embedded plugin view. */
+    /** Mark a native close for destruction after X11 callback dispatch completes. */
+    void request_close() {
+        close_requested_ = true;
+        hide();
+    }
+    bool close_requested() const override { return close_requested_; }
+    /** Temporarily hide the native shell without changing view ownership. */
     void hide() override {
         visible_ = false;
         XUnmapWindow(display_, window_);
@@ -232,7 +238,7 @@ public:
             track_activation();
         } else if (event.type == ClientMessage && event.xclient.window == window_ &&
                    event.xclient.message_type == protocols_ && static_cast<Atom>(event.xclient.data.l[0]) == delete_window_) {
-            hide();
+            request_close();
         } else if ((event.type == CreateNotify && event.xcreatewindow.parent == embed_) ||
                    (event.type == ReparentNotify && event.xreparent.parent == embed_)) {
             // XEmbed clients may create directly under the parent or reparent an existing window.
@@ -406,7 +412,7 @@ private:
     Window window_ = 0; ///< Window-manager-owned top-level editor shell.
     Window embed_ = 0; ///< Host-owned XEmbed parent passed to the SDK view.
     Window plugin_window_ = 0; ///< Borrowed direct child created by the plugin.
-    Atom delete_window_ = None; ///< Native close request, interpreted as hide.
+    Atom delete_window_ = None; ///< Native close request, deferred to host-owned destruction.
     Atom protocols_ = None; ///< ICCCM protocol messages accepted by the editor shell.
     Atom xembed_info_ = None; ///< Embedded client protocol version and mapping flags.
     Atom xembed_ = None; ///< XEmbed protocol message type.
@@ -416,6 +422,7 @@ private:
     Window group_leader_ = 0; ///< Analyzer's window-group leader shared across its Qt windows.
     int width_ = 0; ///< Current physical content width in pixels.
     int height_ = 0; ///< Current physical content height in pixels.
+    bool close_requested_ = false; ///< Deferred destruction requested by WM_DELETE_WINDOW.
     bool visible_ = false; ///< Last commanded/native map state; closing retains the view.
     bool attach_attempted_ = false; ///< Whether removed() is needed, even after partial attachment failure.
     pid_t active_pid_ = 0; ///< Last foreground X11 process, where exposed by the window manager.

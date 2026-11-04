@@ -196,6 +196,8 @@ public:
             return encode(response);
         }
     }
+    /** Dispatch native events and finish deferred editor destruction. */
+    void pump_editor_events() { host_.pump_editor_events(); }
     /** Report whether shutdown was explicitly requested after its response is sent. */
     bool stopping() const {
         // The caller sends the final response before closing the stream.
@@ -450,7 +452,7 @@ int main(int argc, char** argv) {
 
             // UI callbacks, control commands and audio remain serialized on the native main thread.
             while (true) {
-                analyzer::pump_editor_events();
+                session.pump_editor_events();
                 if (!socket->readable(5)) continue;
                 if (!socket->receive(frame)) break;
                 auto response = session.handle(frame);

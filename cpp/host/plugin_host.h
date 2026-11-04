@@ -118,17 +118,19 @@ public:
      * @param path Existing .vstpreset file for this effect class, restored before activation.
      */
     void load_preset(const std::string& path);
-    /** Query and retain the single optional editor view; later checks reuse it without creating a second view. */
+    /** Probe optional editor support once; cache the result without retaining a closed view. */
     bool has_editor() const;
-    /** Show or hide the plugin editor without changing the processing stream.
-     * @param visible True shows or raises the native editor; false hides an existing window.
+    /** Open or destroy the plugin editor without changing the processing stream.
+     * @param visible True creates or raises the native editor; false destroys the window and view.
      */
     void show_editor(bool visible);
+    /** Dispatch platform events and destroy closed views after native close callbacks return. */
+    void pump_editor_events();
     /** Raise an existing visible editor without showing a closed editor or changing focus. */
     void raise_editor();
     /** Report native editor window visibility, including its close button. */
     bool editor_visible() const;
-    /** Return current native editor appearance, including hidden window geometry. */
+    /** Return current native editor appearance, including remembered closed-window geometry. */
     EditorState editor_state() const;
     /** Restore editor visibility and geometry without reconfiguring audio processing.
      * @param state Saved visibility and optional native position/content size to restore.

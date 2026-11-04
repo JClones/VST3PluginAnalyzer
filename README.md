@@ -217,9 +217,11 @@ plugin editor window is active: those keystrokes do not reach VST3 Plugin
 Analyzer. Activate an analyzer window before using its shortcuts.
 
 The plugin's own editor opens by default. **Window → Default Editor** or **F2**
-shows or hides it. **Window → Parameter List** or **F3** opens the analyzer's
-alternative controls, with sliders, checkboxes and editable values. Double-click
-or Alt-click a slider to reset its default value.
+opens or closes it. Closing the editor destroys its window and plugin view;
+reopening creates a fresh editor without reloading the plugin or interrupting
+processing. The last window geometry is retained. **Window → Parameter List**
+or **F3** opens the analyzer's alternative controls, with sliders, checkboxes and
+editable values. Double-click or Alt-click a slider to reset its default value.
 
 Use **Program → Load... / Export...** for `.vstpreset` files. Factory programs
 appear in the same menu when supplied by the plugin. **Plugin → Soft Bypass**
@@ -269,7 +271,7 @@ Use **Ctrl** on Linux and **Cmd** on macOS:
 | Action | Shortcut |
 | --- | --- |
 | Load a plugin | Ctrl/Cmd+O |
-| Show/hide plugin editor | F2 |
+| Open/close plugin editor | F2 |
 | Show/hide parameter list | F3 |
 | Frequency / harmonic response | Ctrl/Cmd+F / Ctrl/Cmd+H |
 | Performance measurement | Ctrl/Cmd+P |
