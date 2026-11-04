@@ -89,16 +89,23 @@ class LiveAnalyzer:
         self.filled = 0  # Valid sample count, capped at one FFT period.
         self.since_update = 0  # Samples accumulated since the previous published spectrum.
         self.hop = min(settings.fft_size, max(1, int(settings.sample_rate / 10)))  # At most ten updates per second.
-        self.latency = dut.latency()  # Reported delay; spectra skip the initial prefix, raw impulses retain it.
-        self.impulse_capture = (ImpulseCapture(self.channel_count, settings.fft_size, settings.sample_rate)
-                                if measurement == "impulse" or (self.ms_mode and measurement == "frequency") else None)  # Raw latency-preserving acquisition.
+        self.latency = dut.latency()  # Reported delay; impulse-based measurements retain the complete prefix.
+        self.impulse_origin = 0  # Next raw input impulse origin for full frequency-response captures.
+        self.impulse_capture = self._new_impulse_capture()
         self.first_block = True  # Resolve parameter-dependent latency after initial queued edits are delivered.
         self.valid_after = 0  # Earliest output frame eligible for an analysis record.
         self._initialize_history()
 
+    def _new_impulse_capture(self):
+        """Frequency analysis also retains output from the FFT-size recovery interval."""
+        if self.measurement not in ("impulse", "frequency"):
+            return None
+        frequency = self.measurement == "frequency"
+        return ImpulseCapture(self.channel_count, self.settings.fft_size * (2 if frequency else 1),
+                              self.settings.sample_rate, complete_period=frequency)
+
     def _initialize_history(self):
-        """Exclude only initial reported latency when a stream is created."""
-        # Keep startup transients after the latency prefix in the first FFT period.
+        """Initialize the rolling history used by continuous tone/noise spectra."""
         self.filled = self.since_update = 0
         self.valid_after = self.samples_processed + self.latency
 
@@ -111,24 +118,26 @@ class LiveAnalyzer:
         self._initialize_history()
         self.ms_pending = None
         self.ms_capture_index = 0
+        self.impulse_origin = 0
         if self.impulse_capture is not None:
-            self.impulse_capture = ImpulseCapture(self.channel_count, self.settings.fft_size, self.settings.sample_rate)
+            self.impulse_capture = self._new_impulse_capture()
 
     def step(self) -> LiveFrame | None:
         """Process one small continuous block and optionally return a fresh FFT frame."""
-        # Each impulse cycle contains an FFT-size measurement followed by an FFT-size silent recovery block.
+        # Frequency captures include the latency prefix, measurement and silent recovery output.
         if self.measurement in ("frequency", "impulse"):
-            remaining = (self.impulse_capture.remaining(self.latency) if self.impulse_capture is not None else
-                         self.valid_after - self.samples_processed if self.samples_processed < self.valid_after else
-                         self.settings.fft_size - self.filled)
+            remaining = self.impulse_capture.remaining(self.latency)
             self.chunk_size = min(self.settings.block_size, max(1, int(self.settings.sample_rate * 0.02)), remaining)
             positions = np.arange(self.chunk_size) + self.samples_processed
-            sine = (positions % (2 * self.settings.fft_size) == 0).astype(np.float64)
+            sine = ((positions == self.impulse_origin) if self.measurement == "frequency" else
+                    (positions % (2 * self.settings.fft_size) == 0)).astype(np.float64)
             audio = [sine] * self.channel_count
             if self.ms_mode and self.channel_count == 2:
                 if self.ms_excitation == "interleaved":
                     # Alternate common and opposite-polarity impulses on the same plugin instance.
-                    polarity = np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0)
+                    polarity = ((1.0 if self.ms_capture_index % 2 == 0 else -1.0)
+                                if self.measurement == "frequency" else
+                                np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0))
                     audio = [sine, sine * polarity]
                 else:
                     silence = np.zeros_like(sine)
@@ -150,11 +159,19 @@ class LiveAnalyzer:
         latency = self.dut.latency()
         if type(latency) is not int or not 0 <= latency <= self.settings.sample_rate * 60:
             raise ValueError("Plugin reported invalid live latency")
-        self.latency = latency
+        previous_latency, self.latency = self.latency, latency
         if self.first_block:
-            # Initial parameter delivery can establish a new startup latency; later edits never clear history.
+            # Initial parameter delivery can establish latency; keep all of the first impulse prefix.
             self.valid_after = self.latency
             self.first_block = False
+        elif self.measurement == "frequency" and latency != previous_latency:
+            # A new time origin invalidates a partially captured response or M/S pair.
+            # Begin a fresh impulse at the next block without reconfiguring the plugin.
+            self.impulse_capture = self._new_impulse_capture()
+            self.impulse_origin = self.samples_processed
+            self.ms_pending = None
+            self.ms_capture_index = 0
+            return None
 
         # Time-domain measurement keeps the raw latency interval before the aligned zero-time sample.
         if self.impulse_capture is not None:
@@ -162,6 +179,8 @@ class LiveAnalyzer:
             if captured is None:
                 return None
             results, linked = captured
+            if self.measurement == "frequency":
+                self.impulse_origin += self.impulse_capture.period_size
             if self.ms_mode:
                 if len(results) == 2:
                     left, right = results[0].samples, results[1].samples
@@ -186,14 +205,19 @@ class LiveAnalyzer:
                     linked = False
                 else:
                     results, linked = (results[0],), True
-                if self.measurement == "frequency":
-                    # Raw captures retain the prefix; FFT records start at latency-aligned time zero.
-                    results = tuple(analyze_frequency_response(channel.samples[-self.settings.fft_size:],
-                                                               self.settings.sample_rate) for channel in results)
+            if self.measurement == "frequency":
+                # Every captured sample contributes, including negative-time pre-ringing.
+                # Retain each capture's own time origin (Mid and Side may report different latency).
+                results = tuple(analyze_frequency_response(channel.samples, self.settings.sample_rate,
+                                                           self.settings.phase_threshold_db,
+                                                           fft_size=self.settings.fft_size,
+                                                           latency_samples=int(round(-channel.times_ms[0] *
+                                                                                     self.settings.sample_rate / 1000)))
+                                for channel in results)
             return LiveFrame(results, linked, 0.0, self.setup["processing_precision"], self.latency,
                              self.samples_processed, measurement=self.measurement, ms_mode=self.ms_mode, ms_excitation=self.ms_excitation)
 
-        # Exclude the initial latency prefix or a scheduled recovery interval without resetting the plugin.
+        # Continuous tone/noise spectra exclude only their initial startup latency.
         skip = max(0, self.valid_after - previous)
         output = output[:, min(skip, self.chunk_size):]
         if not output.size:
@@ -208,7 +232,7 @@ class LiveAnalyzer:
         self.write_position = (self.write_position + count) % self.settings.fft_size
         self.filled = min(self.settings.fft_size, self.filled + count)
         self.since_update += count
-        if self.filled < self.settings.fft_size or self.since_update < (self.settings.fft_size if self.measurement == "frequency" else self.hop):
+        if self.filled < self.settings.fft_size or self.since_update < self.hop:
             return None
 
         # Compare samples before FFT: equal magnitudes can conceal stereo phase differences.
@@ -217,12 +241,7 @@ class LiveAnalyzer:
             # Decode continuous output only; harmonic input remains identical on Left and Right.
             record = np.stack(((record[0] + record[1]) / 2, (record[0] - record[1]) / 2))
         linked = self.channel_count == 1 or (not self.ms_mode and np.array_equal(record[0], record[1]))
-        if self.measurement == "frequency":
-            results = tuple(analyze_frequency_response(channel, self.settings.sample_rate) for channel in record)
-            # Process one more FFT-size block at the normal pace, ignoring its latency-aligned output.
-            self.filled = 0
-            self.valid_after = self.samples_processed + self.settings.fft_size
-        elif self.generators:
+        if self.generators:
             results = tuple(analyze_spectrum(channel, self.settings.sample_rate) for channel in record)
         else:
             results = tuple(analyze_thd(channel, self.settings.sample_rate, self.bin_index) for channel in record)

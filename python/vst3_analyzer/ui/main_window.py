@@ -60,6 +60,7 @@ class MainWindow(QMainWindow):
         self.spectrum = SpectrumView()  # Large central FFT canvas.
         self.spectrum.set_measurement("frequency")  # New sessions start with Frequency Response.
         self.spectrum.set_sample_rate(settings.sample_rate, settings.fft_size)
+        self.spectrum.set_phase_threshold(settings.phase_threshold_db)
         self.spectrum.reset_view()
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -718,6 +719,7 @@ class MainWindow(QMainWindow):
         settings = replace(settings, precision="auto")
         self.settings = settings
         self.spectrum.set_sample_rate(settings.sample_rate, settings.fft_size)
+        self.spectrum.set_phase_threshold(settings.phase_threshold_db)
         self.worker.submit("settings", settings=settings)
 
     def _load_settings(self):

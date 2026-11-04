@@ -18,6 +18,7 @@ class MeasurementSettings:
     precision: str = "auto"  # Native plugin mode: auto, float32 or float64.
 
     sine_level_dbfs: float = 0.0  # Requested peak sine level in dBFS; 0 dBFS gives amplitude one.
+    phase_threshold_db: float = -160.0  # Phase/group-delay validity floor; magnitude remains unchanged.
 
     def __post_init__(self):
         """Reject invalid settings before launching acquisition or allocating test vectors."""
@@ -37,6 +38,9 @@ class MeasurementSettings:
         if (isinstance(self.sine_level_dbfs, bool) or not math.isfinite(self.sine_level_dbfs) or
                 not -6000 <= self.sine_level_dbfs <= 6000):
             raise ValueError("Sine level must be finite and within [-6000, 6000] dBFS")
+        if (isinstance(self.phase_threshold_db, bool) or not math.isfinite(self.phase_threshold_db) or
+                not -300 <= self.phase_threshold_db <= 0):
+            raise ValueError("Phase calculation threshold must be finite and within [-300, 0] dB")
         selected = math.floor(self.frequency * self.fft_size / self.sample_rate + 0.5)
         if not 1 <= selected < self.fft_size // 2:
             raise ValueError("Nearest frequency bin is DC or Nyquist; change frequency or FFT size")

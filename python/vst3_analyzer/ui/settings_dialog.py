@@ -60,6 +60,16 @@ class SettingsDialog(QDialog):
         harmonic_layout = QFormLayout(harmonic)
         harmonic_layout.addRow("Sine Frequency, Hz", self.frequency)
         harmonic_layout.addRow("Sine Level, dBFS", self.level)
+        self.phase_threshold = QDoubleSpinBox()
+        self.phase_threshold.setRange(-300, 0)
+        self.phase_threshold.setDecimals(1)
+        self.phase_threshold.setSingleStep(10)
+        self.phase_threshold.setSuffix(" dB")
+        self.phase_threshold.setValue(settings.phase_threshold_db)
+        self.phase_threshold.setToolTip("Phase and group delay below this magnitude are treated as unknown. Magnitude is unchanged.")
+        frequency_response = QGroupBox("Frequency Response Test")
+        response_layout = QFormLayout(frequency_response)
+        response_layout.addRow("Phase calculation threshold", self.phase_threshold)
         self.latency = QLabel()  # Current reported delay at the active plugin sample rate.
         self.set_latency(None)
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Apply)
@@ -75,6 +85,7 @@ class SettingsDialog(QDialog):
         section_gap.setFixedHeight(8)
         layout.addRow(section_gap)
         layout.addRow(harmonic)
+        layout.addRow(frequency_response)
         layout.addRow("Plugin latency", self.latency)
         layout.addRow(buttons)
 
@@ -97,7 +108,8 @@ class SettingsDialog(QDialog):
                                            fft_size=self.size.currentData(), block_size=self.block.value(),
                                            precision="auto",
                                            frequency=self.frequency.value(),
-                                           sine_level_dbfs=self.level.value())
+                                           sine_level_dbfs=self.level.value(),
+                                           phase_threshold_db=self.phase_threshold.value())
         except ValueError as error:
             QMessageBox.warning(self, "Invalid settings", str(error))
             return False

@@ -35,7 +35,12 @@ Harmonic measurements use a sine aligned to an FFT bin, so the actual frequency
 may differ slightly from the requested one. Magnitude, phase and group delay
 measurements feed a unity impulse into the plugin. M/S mode offers separate Mid
 and Side impulses or a single left-only/right-only impulse to derive both responses.
+Frequency-response measurements retain pre-ringing and the impulse tail during
+the recovery interval; reported latency is compensated without discarding samples.
 Processing uses the plugin's supported precision; analysis uses 64-bit floating point precision.
+Phase and group delay use an adjustable validity threshold (−160 dB by default),
+omit unsupported edge ranges and interpolate bounded gaps, marking estimates with dashed lines. Magnitude measurements retain
+their full range. See the [usage guide](docs/usage.md#phase-and-group-delay) for details.
 
 ## Install
 

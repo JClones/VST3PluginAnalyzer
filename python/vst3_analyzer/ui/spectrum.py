@@ -1,18 +1,18 @@
 # Copyright (c) 2026 vladg/sound
 # SPDX-License-Identifier: MIT
 """Compact white-background FFT view with sample-driven stereo trace colors."""
+from dataclasses import replace
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QPainter, QPalette
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
-from .comparisons import MS_COLORS, TRACE_COLORS, capture_response, copy_plot, display_values, fade_stored_curve, render_stored_response
+from .comparisons import MS_COLORS, TRACE_COLORS, capture_response, copy_plot, display_values, fade_stored_curve, render_stored_response, response_phase_paths
 from .decibel_axis import DecibelAxis
 from .frequency_axis import FrequencyAxis
 from .time_axis import TimeAxis
 from .impulse_curve import ImpulseCurveRenderer
-from .phase_curve import wrapped_phase_paths
 from .plot_export import ExportTrace
 from .plot_cursor import PlotCursor
 from .navigation import AnalyzerPlotWidget, AnalyzerViewBox
@@ -66,6 +66,7 @@ class SpectrumView(QWidget):
         self.reference = None  # Deep-copied absolute frequency-response frame, never persisted.
         self.response_view = "magnitude"  # Selected frequency-response representation.
         self.latest_frame = None  # Latest matching record, reused when changing only the view.
+        self.phase_threshold_db = -160.0
         self.ms_excitation = "interleaved"
         self.ms_mode = False  # Channel interpretation shared with acquisition and numeric overlays.
         self.measurement = "harmonic"  # Determines default vertical bounds and readout visibility.
@@ -98,7 +99,7 @@ class SpectrumView(QWidget):
         self.wrap_connections = []  # Faint wrap-jump overlays matching linked, left and right trace colors.
         for color in TRACE_COLORS:
             # Separate overlays let wrap jumps use a lighter stroke without thinning the measured phase curve.
-            pen = pg.mkPen(color, width=1.75, style=Qt.DotLine)
+            pen = pg.mkPen(color, width=1.75, style=Qt.DashLine)
             tint = pen.color()
             tint.setAlphaF(0.35)
             pen.setColor(tint)
@@ -148,6 +149,21 @@ class SpectrumView(QWidget):
         for stored in self.stored_plots:
             for curve in stored.curves:
                 fade_stored_curve(curve, left, right)
+
+    def set_phase_threshold(self, threshold_db):
+        """Recalculate live, stored and reference phase without discarding captured measurements."""
+        if self.phase_threshold_db == threshold_db:
+            return
+        self.phase_threshold_db = threshold_db
+        for stored in self.stored_plots:
+            if stored.responses:
+                stored.responses = tuple(replace(channel, phase_threshold_db=threshold_db)
+                                         for channel in stored.responses)
+                render_stored_response(self.plot, stored, stored.view)
+        if self.latest_frame is not None:
+            self.show_frame(self.latest_frame)
+        else:
+            self._update_stored_visibility()
 
     def set_ms_mode(self, enabled, excitation="interleaved"):
         """Set enabled M/S channel interpretation and discard incompatible captures and comparisons."""
@@ -486,8 +502,13 @@ class SpectrumView(QWidget):
             frame: Latest absolute live response, never mutated by comparison display.
         """
         channels, linked = frame.channels, frame.linked
+        if frame.measurement == "frequency":
+            channels = tuple(channel if channel.phase_threshold_db == self.phase_threshold_db else
+                             replace(channel, phase_threshold_db=self.phase_threshold_db) for channel in channels)
         if frame.measurement == "frequency" and self.reference is not None:
-            reference = self.reference.channels
+            reference = tuple(channel if channel.phase_threshold_db == self.phase_threshold_db else
+                              replace(channel, phase_threshold_db=self.phase_threshold_db)
+                              for channel in self.reference.channels)
             if len(reference) != len(channels) or not np.array_equal(reference[0].frequencies_hz, channels[0].frequencies_hz):
                 self.reference = None
             else:
@@ -548,12 +569,12 @@ class SpectrumView(QWidget):
         active = ((self.linked, self.wrap_connections[0], amplitudes[0]),) if linked else (
             (self.left, self.wrap_connections[1], amplitudes[0]),
             (self.right, self.wrap_connections[2], amplitudes[1]))
-        wrapped = self.measurement == "frequency" and self.response_view == "wrapped"
-        for curve, overlay, values in active:
+        phase_view = self.measurement == "frequency" and view in ("wrapped", "unwrapped", "delay")
+        for (curve, overlay, values), channel in zip(active, channels):
             set_curve_rendering(curve, values, self.measurement)
-            if wrapped:
-                # Draw every interpolated wrap segment faintly, including the legs to the phase boundaries.
-                solid_x, solid_y, connector_x, connector_y = wrapped_phase_paths(frequency, values)
+            if phase_view:
+                # Measured samples remain solid; bounded estimates and wrap legs are dashed.
+                solid_x, solid_y, connector_x, connector_y = response_phase_paths(channel, view, values)
                 curve.setData(solid_x, solid_y, connect="finite")
                 if connector_x.size:
                     overlay.setData(connector_x, connector_y, connect="finite")

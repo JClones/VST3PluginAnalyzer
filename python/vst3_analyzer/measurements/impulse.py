@@ -1,17 +1,18 @@
 # Copyright (c) 2026 vladg/sound
 # SPDX-License-Identifier: MIT
-"""Continuous impulse capture retaining latency prefixes and ignoring silent recovery blocks."""
+"""Continuous impulse capture retaining latency prefixes and optional recovery output."""
 import numpy as np
 from ..dsp.impulse import analyze_impulse_response
 
 
 class ImpulseCapture:
-    """Retain raw output from each input impulse through its latency and one full FFT period."""
+    """Retain raw output from each input impulse through its latency and requested record length."""
 
-    def __init__(self, channels, record_size, sample_rate):
+    def __init__(self, channels, record_size, sample_rate, *, complete_period=False):
         """Create history for channels outputs, record_size post-zero samples and sample_rate Hz."""
-        self.record_size = record_size  # Post-zero measurement length, before one equally long silent recovery block.
-        self.period_size = 2 * record_size  # Input impulse spacing, including the ignored recovery block.
+        self.record_size = record_size  # Number of samples retained after the reported latency.
+        self.complete_period = complete_period  # Frequency analysis retains the silent recovery output too.
+        self.period_size = record_size if complete_period else 2 * record_size  # Updated with latency on append.
         self.sample_rate = sample_rate  # Frequency used to express sample times in milliseconds.
         self.pending = np.empty((channels, 0), dtype=np.float64)  # Raw output from the next impulse origin.
         self.skip_remaining = 0  # Unneeded output until the next input impulse's raw latency prefix begins.
@@ -35,9 +36,11 @@ class ImpulseCapture:
         output = output[:, skipped:]
         if not output.size:
             return None
-        # Unlike FFT acquisition, retain the entire prefix, even if latency changes during processing.
+        # Retain the entire prefix, even if latency changes during processing.
         self.pending = np.concatenate((self.pending, output), axis=1)
         length = self.record_size + latency
+        if self.complete_period:
+            self.period_size = length
         if self.pending.shape[1] < length:
             return None
         record = self.pending[:, :length]

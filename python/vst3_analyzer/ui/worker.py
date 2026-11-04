@@ -165,7 +165,14 @@ class AnalyzerWorker(QThread):
                                 with self.frame_lock:
                                     self.latest_frame = None
                             else:
-                                self.settings = values["settings"]
+                                updated = values["settings"]
+                                analysis_only = replace(self.settings, phase_threshold_db=updated.phase_threshold_db) == updated
+                                self.settings = updated
+                                if analysis_only and stream is not None:
+                                    # A validity floor changes analysis only: keep the processor and capture history running.
+                                    stream.settings = updated
+                                    self.settings_applied.emit({"settings": updated, "latency": stream.latency})
+                                    continue
                                 # Old-rate frames must not overwrite latency after the configuration acknowledgement.
                                 with self.frame_lock:
                                     self.latest_frame = None

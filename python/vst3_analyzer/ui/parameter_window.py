@@ -76,6 +76,30 @@ class ParameterToggle(QCheckBox):
             self.normalized_changed.emit(self.normalized_value())
 
 
+class ParameterValueEdit(QLineEdit):
+    """Select the value on entry, while allowing normal selection once focused."""
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self._select_on_release = event.reason() == Qt.MouseFocusReason
+        if not self.isReadOnly():
+            self.selectAll()
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton and getattr(self, "_select_on_release", False):
+            self._select_on_release = False
+            if not self.isReadOnly() and not self.hasSelectedText():
+                self.selectAll()
+
+
+def _parameter_value_text(parameter):
+    """Append SDK units once, keeping the plugin's own formatted value intact."""
+    text = parameter["display"]
+    units = parameter.get("units", "").strip()
+    return f"{text} {units}" if units and not text.rstrip().endswith(units) else text
+
+
 class ParameterWindow(QWidget):
     """Own a separate, resizable parameter window whose table provides scrolling."""
 
@@ -90,6 +114,7 @@ class ParameterWindow(QWidget):
         self.resize(720, 500)
         self.rows = {}  # Stable parameter ID to table row; never exposed as a visible column.
         self.metadata = {}  # Last authoritative values, used to restore rejected text edits.
+        self.editors = {}  # Stable parameter ID to editable formatted value.
         self.table = QTableWidget(0, 3, self)  # Scrollable name, normalized control and logical value columns.
         self.table.setHorizontalHeaderLabels(["Parameter", "Value", "Plugin value"])
         self.table.verticalHeader().hide()
@@ -106,6 +131,7 @@ class ParameterWindow(QWidget):
         """Build controls from the plugin's parameter descriptors in parameters."""
         self.rows.clear()
         self.metadata.clear()
+        self.editors.clear()
         self.table.setRowCount(0)
         self.table.setRowCount(len(parameters))
         for row, parameter in enumerate(parameters):
@@ -118,19 +144,29 @@ class ParameterWindow(QWidget):
             control.normalized_changed.connect(
                 lambda value, parameter_id=identifier: self.normalized_requested.emit(parameter_id, value))
             self.table.setCellWidget(row, 1, control)
-            editor = QLineEdit(parameter["display"])
+            editor = ParameterValueEdit(_parameter_value_text(parameter))
             editor.setReadOnly(bool(parameter["flags"] & 2))
             editor.setToolTip(parameter["units"])
             editor.editingFinished.connect(lambda parameter_id=identifier: self._submit_text(parameter_id))
+            self.editors[identifier] = editor
             self.table.setCellWidget(row, 2, editor)
         self.table.resizeRowsToContents()
 
     def _submit_text(self, identifier):
         """Submit modified logical value text for stable parameter identifier."""
-        editor = self.table.cellWidget(self.rows[identifier], 2)
+        editor = self.editors[identifier]
         if editor.isModified():
             editor.setModified(False)
-            self.text_requested.emit(identifier, editor.text())
+            text = editor.text()
+            parameter = self.metadata[identifier]
+            units = parameter.get("units", "").strip()
+            # Only remove the suffix we added. Plugins control their own text grammar,
+            # and VST3 does not require parsers to accept the separate SDK units field.
+            if units and not parameter["display"].rstrip().endswith(units):
+                suffix = " " + units
+                if text.rstrip().endswith(suffix):
+                    text = text.rstrip()[:-len(suffix)].rstrip()
+            self.text_requested.emit(identifier, text)
 
     def update_parameters(self, parameters, force_text_id=None):
         """Refresh parameters without overwriting active typing or dragging; force_text_id confirms an edit."""
@@ -143,17 +179,20 @@ class ParameterWindow(QWidget):
             control = self.table.cellWidget(row, 1)
             if not isinstance(control, QSlider) or not control.isSliderDown():
                 control.set_normalized_value(parameter["value"], notify=False)
-            editor = self.table.cellWidget(row, 2)
-            # Preserve unsubmitted text even while native X11 window activation/focus is in flight.
-            if identifier == force_text_id or not editor.isModified():
-                editor.setText(parameter["display"])
+            editor = self.editors[identifier]
+            editor.setToolTip(parameter["units"])
+            # Polling must not reset the cursor/selection, even before the first keystroke.
+            if identifier == force_text_id or (not editor.isModified() and not editor.hasFocus()):
+                text = _parameter_value_text(parameter)
+                if editor.text() != text:
+                    editor.setText(text)
                 editor.setModified(False)
 
     def restore_text(self, identifier):
         """Restore the last authoritative value after a rejected text edit for identifier."""
         if identifier in self.rows:
-            editor = self.table.cellWidget(self.rows[identifier], 2)
-            editor.setText(self.metadata[identifier]["display"])
+            editor = self.editors[identifier]
+            editor.setText(_parameter_value_text(self.metadata[identifier]))
             editor.setModified(False)
 
     def showEvent(self, event):

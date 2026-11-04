@@ -8,7 +8,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QLinearGradient
 
-from .phase_curve import wrapped_phase_paths
+from .phase_curve import phase_paths
 from .plot_strokes import register_stroke, set_curve_rendering
 
 TRACE_COLORS = ("#ff00ff", "#0000f5", "#ea3323")  # Linked/mono, left and right colors shared by live and stored traces.
@@ -46,6 +46,14 @@ def display_values(channel, view):
         return 20 * np.log10(np.maximum(channel.amplitudes_peak, np.finfo(np.float64).tiny))
     component = {"wrapped": 0, "unwrapped": 1, "delay": 2}[view]
     return channel.phase_and_delay()[component]
+
+
+def response_phase_paths(channel, view, values=None):
+    """Return solid measured values and dashed phase or direct-delay estimates."""
+    if values is None:
+        values = display_values(channel, view)[1:]
+    interpolated = channel.delay_interpolation_mask() if view == "delay" else channel.phase_interpolation_mask()
+    return phase_paths(channel.frequencies_hz[1:], values, interpolated[1:], view == "wrapped")
 
 
 def fade_stored_curve(curve, left, right):
@@ -158,12 +166,12 @@ def render_stored_response(plot, stored, view):
         frequency = channel.frequencies_hz[1:]
         values = display_values(channel, view)[1:]
         pen = pg.mkPen(MS_COLORS[index] if stored.ms_mode else TRACE_COLORS[0 if stored.linked else index + 1])
-        if view == "wrapped":
-            # Reconstruct both solid phase and faint dotted wrap paths from the frozen phase data.
-            solid_x, solid_y, connector_x, connector_y = wrapped_phase_paths(frequency, values)
+        if view in ("wrapped", "unwrapped", "delay"):
+            # Preserve estimated gaps and phase-wrap decoration in frozen captures too.
+            solid_x, solid_y, connector_x, connector_y = response_phase_paths(channel, view, values)
             curves.append(add_stored_curve(plot, solid_x, solid_y, pen, "frequency"))
             if connector_x.size:
-                pen.setStyle(Qt.DotLine)
+                pen.setStyle(Qt.DashLine)
                 color = pen.color()
                 color.setAlphaF(0.35)
                 pen.setColor(color)

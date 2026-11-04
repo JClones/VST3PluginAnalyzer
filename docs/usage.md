@@ -43,6 +43,42 @@ from 1,024 to 65,536 samples. Precision is automatic: float64 plugin I/O if
 supported, float32 otherwise, with float64 analysis and IPC. **Apply** updates the
 measurement and latency display without closing the dialog.
 
+Below **Harmonic Response Test**, the **Frequency Response Test** section contains
+**Phase calculation threshold**, adjustable from −300 to 0 dB (default −160 dB).
+Raise it to exclude more of a noisy stopband. Changing only this threshold keeps
+audio processing and capture history running, and updates live, stored and
+reference plots without discarding their measurements.
+
+## Phase and group delay
+
+Phase analysis treats magnitudes below the configured threshold as unknown, without changing the
+magnitude measurement or its display. An isolated missing bin or a longer gap
+bounded by valid phase is interpolated along the shortest phase arc. These
+estimates use faint dashed lines in wrapped/unwrapped phase, as do phase-wrap
+connectors. Group delay is calculated directly from the captured impulse response,
+using `Re{FFT((n−L)·h[n]) / FFT(h[n])}` in samples, where `L` is reported
+latency, rather than differentiating phase.
+Reference plots subtract the reference's delay. Bounded gaps in direct delay are
+interpolated separately and dashed too. Missing leading or trailing ranges are omitted,
+not extrapolated. At a true spectral zero, interpolated phase and delay remain
+estimates rather than measured values.
+
+Frequency-response acquisition retains the complete latency prefix, including
+pre-ringing, and the output during the silent recovery interval. Reported latency
+is compensated mathematically in phase and group delay; no prefix is cut off.
+The selected FFT size determines the frequency grid; the captured record includes
+twice that many post-zero samples to retain more of the impulse tail. All recorded
+samples contribute to the analysis. Longer FFT sizes can still be needed for very
+long responses, especially when measuring group delay in a deeply attenuated band.
+
+Unwrapping is anchored at the stronger response edge (the low-frequency edge wins
+near ties), so a near-zero high-pass stopband does not set the phase branch.
+Unwrapped phase has an arbitrary whole-turn offset; that offset does not affect
+group delay. Noise above the selected threshold is still included: neither the
+threshold nor the direct-delay method recovers information lost to float32 errors
+or an insufficient capture length. Spectrum-only responses without a captured
+impulse retain phase differentiation as a fallback.
+
 ## Plot navigation and display
 
 Plugins run in a separate process, so analyzer shortcuts do not work while the

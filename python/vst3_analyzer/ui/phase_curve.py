@@ -1,6 +1,6 @@
 # Copyright (c) 2026 vladg/sound
 # SPDX-License-Identifier: MIT
-"""Display-only paths for wrapped phase, with faint straight boundary legs and wrap connections."""
+"""Measured phase paths with separate interpolation estimates and phase-wrap connectors."""
 import numpy as np
 
 
@@ -43,3 +43,26 @@ def wrapped_phase_paths(frequencies, values):
     connector_y = np.column_stack((values[jumps], boundary, -boundary,
                                    values[jumps + 1], separators)).ravel()
     return solid_x, solid_y, connector_x, connector_y
+
+
+def phase_paths(frequencies, values, interpolated, wrapped=False):
+    """Separate measured phase from bounded estimates and optional wrap connectors."""
+    if not np.any(interpolated):
+        if wrapped:
+            return wrapped_phase_paths(frequencies, values)
+        return frequencies, values, np.array([]), np.array([])
+    solid = values.copy()
+    solid[interpolated] = np.nan
+    # A bridge includes the reliable endpoints, but never joins unrelated gaps.
+    segments = (interpolated[:-1] | interpolated[1:]) & np.isfinite(values[:-1]) & np.isfinite(values[1:])
+    keep = np.r_[segments, False] | np.r_[False, segments]
+    estimated = np.where(keep, values, np.nan)
+    breaks = np.flatnonzero(keep[:-1] & keep[1:] & ~segments) + 1
+    bridge_x = np.insert(frequencies, breaks, np.nan)
+    bridge_y = np.insert(estimated, breaks, np.nan)
+    if not wrapped:
+        return frequencies, solid, bridge_x, bridge_y
+    solid_x, solid_y, wrap_x, wrap_y = wrapped_phase_paths(frequencies, solid)
+    bridge_x, bridge_y, bridge_wrap_x, bridge_wrap_y = wrapped_phase_paths(bridge_x, bridge_y)
+    return (solid_x, solid_y, np.r_[wrap_x, np.nan, bridge_x, np.nan, bridge_wrap_x],
+            np.r_[wrap_y, np.nan, bridge_y, np.nan, bridge_wrap_y])
