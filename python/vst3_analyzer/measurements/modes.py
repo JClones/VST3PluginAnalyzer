@@ -7,3 +7,5 @@ MEASUREMENTS = {"frequency": "Frequency Response", "harmonic": "Harmonic Respons
 GENERATORS = {"white_noise": "White Noise", "pink_noise": "Pink Noise",
               "silence": "Silence"}  # Continuous generator modes, in menu order.
 SPECTRUM_MODES = ("harmonic", *GENERATORS)  # Modes using a rolling, peak-normalized magnitude FFT.
+
+MS_EXCITATIONS = {"interleaved": "Interleaved", "left": "Left only", "right": "Right only"}

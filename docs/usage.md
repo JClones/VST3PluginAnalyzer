@@ -64,9 +64,24 @@ to +1. Wrapped phase is bounded by ±180°. Plot values below −300 dB are show
 −∞ dB by cursor inspection.
 
 Identical stereo output is magenta; different left/right output is blue/red.
-**Plot → M/S Mode** enables Mid/Side inspection. Frequency and impulse responses
-use separate Mid and Side excitations; harmonic response uses equal L/R excitation
-and decodes the output to Mid/Side.
+**Plot → M/S Mode** selects Mid/Side inspection for stereo plugins:
+
+- **Interleaved** alternates Mid-only and Side-only impulses, measuring M→M and
+  S→S separately. The two plots may briefly be out of sync after parameter changes.
+- **Left only** feeds a unit impulse only to the left input and derives both
+  responses from the same capture.
+- **Right only** does the same with the right input.
+- **Off (Left/Right)** restores the stereo display.
+
+The excitation choice applies to Frequency Response and Impulse Response.
+One-sided responses are normalized to the injected components: Left-only uses
+Mid=L+R and Side=L−R; Right-only uses Mid=L+R and Side=R−L. An unchanged stereo
+signal path therefore reads 0 dB in both frequency plots, with correct phase.
+These one-sided results include cross-conversion between Mid and Side; unlike
+Interleaved, they do not isolate M→M and S→S. Switching the selection clears
+stored curves and references. The selection is saved with the session.
+Harmonic response retains equal L/R tone input, and generator signals are unchanged;
+both decode their output to Mid/Side as before.
 
 **Store** keeps the current response behind the live plot, across frequency-response
 view types; repeat to accumulate comparisons. **Clear** removes stored responses.

@@ -66,6 +66,7 @@ class SpectrumView(QWidget):
         self.reference = None  # Deep-copied absolute frequency-response frame, never persisted.
         self.response_view = "magnitude"  # Selected frequency-response representation.
         self.latest_frame = None  # Latest matching record, reused when changing only the view.
+        self.ms_excitation = "interleaved"
         self.ms_mode = False  # Channel interpretation shared with acquisition and numeric overlays.
         self.measurement = "harmonic"  # Determines default vertical bounds and readout visibility.
         self.latency_samples = 0  # Latest impulse-response alignment and negative-time extent.
@@ -148,8 +149,9 @@ class SpectrumView(QWidget):
             for curve in stored.curves:
                 fade_stored_curve(curve, left, right)
 
-    def set_ms_mode(self, enabled):
+    def set_ms_mode(self, enabled, excitation="interleaved"):
         """Set enabled M/S channel interpretation and discard incompatible captures and comparisons."""
+        self.ms_excitation = excitation
         self.ms_mode = bool(enabled)
         self.clear()
         self.cursor.ms_mode = self.ms_mode
@@ -499,7 +501,8 @@ class SpectrumView(QWidget):
         """Update the active trace set according to exact time-domain channel equality."""
         # DC is excluded from the logarithmic axis; zero handling does not alter analysis data.
         channels = frame.channels
-        if frame.measurement != self.measurement or frame.ms_mode != self.ms_mode:
+        if (frame.measurement != self.measurement or frame.ms_mode != self.ms_mode or
+                (self.ms_mode and frame.ms_excitation != self.ms_excitation)):
             return  # Ignore an already queued frame from the previous measurement.
         self.latest_frame = frame
         channels, linked = self._display_channels(frame)

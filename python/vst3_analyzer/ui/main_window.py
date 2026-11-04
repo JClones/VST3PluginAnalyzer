@@ -21,7 +21,7 @@ from .plugin_dialog import PluginDirectoryDialog
 from .spectrum import SpectrumView
 from .worker import AnalyzerWorker
 from ..settings import MeasurementSettings
-from ..measurements.modes import GENERATORS, MEASUREMENTS
+from ..measurements.modes import GENERATORS, MEASUREMENTS, MS_EXCITATIONS
 
 
 class MainWindow(QMainWindow):
@@ -279,9 +279,20 @@ class MainWindow(QMainWindow):
         self.cursor_values_action = self.view_menu.addAction("Show Cursor Values")
         self.cursor_values_action.setCheckable(True)
         self.cursor_values_action.toggled.connect(self.spectrum.cursor.set_enabled)
-        self.ms_mode_action = self.view_menu.addAction("M/S Mode")
-        self.ms_mode_action.setCheckable(True)
-        self.ms_mode_action.toggled.connect(self._set_ms_mode)
+        self.ms_mode_menu = self.view_menu.addMenu("M/S Mode")
+        self.ms_mode_group = QActionGroup(self)
+        self.ms_mode_group.setExclusive(True)
+        self.ms_mode_actions = {}
+        for mode, label in {"off": "Off (Left/Right)", **MS_EXCITATIONS}.items():
+            if mode == "interleaved":
+                self.ms_mode_menu.addSeparator()
+            action = self.ms_mode_menu.addAction(label)
+            action.setCheckable(True)
+            action.setData(mode)
+            self.ms_mode_group.addAction(action)
+            self.ms_mode_actions[mode] = action
+            action.triggered.connect(lambda _checked=False, selected=mode: self._set_ms_mode(selected))
+        self.ms_mode_actions["off"].setChecked(True)
         self.view_menu.addSeparator()
         self.zoom_in_action = self.view_menu.addAction("Zoom In", lambda: self.spectrum.zoom(0.8, QGuiApplication.queryKeyboardModifiers()))
         self.zoom_out_action = self.view_menu.addAction("Zoom Out", lambda: self.spectrum.zoom(1.25, QGuiApplication.queryKeyboardModifiers()))
@@ -336,12 +347,15 @@ class MainWindow(QMainWindow):
             self.performance_action.setEnabled(self.unload_action.isEnabled())
             dialog.deleteLater()
 
-    def _set_ms_mode(self, enabled):
-        """Apply enabled M/S acquisition, clearing incompatible comparisons and queued display data."""
+    def _set_ms_mode(self, mode):
+        """Select L/R or an M/S excitation, discarding incompatible comparisons and frames."""
+        enabled = mode != "off"
+        excitation = mode if enabled else "interleaved"
+        self.ms_mode_actions[mode].setChecked(True)
         # Channel meaning changes, so references and snapshots cannot carry across this switch.
         self.last_frame = None
-        self.spectrum.set_ms_mode(enabled)
-        self.worker.submit("ms_mode", enabled=enabled)
+        self.spectrum.set_ms_mode(enabled, excitation)
+        self.worker.submit("ms_mode", enabled=enabled, excitation=excitation)
 
     def _select_measurement(self, measurement):
         """Switch stimulus and reset the plot to the measurement's default range."""
@@ -631,7 +645,9 @@ class MainWindow(QMainWindow):
         """Render the newest spectrum with its combined distortion readout."""
         # Color choice is carried from exact waveform equality, including stereo phase.
         frame = self.worker.take_frame()
-        if frame is None or frame.measurement != self.spectrum.measurement or frame.ms_mode != self.spectrum.ms_mode:
+        if (frame is None or frame.measurement != self.spectrum.measurement or
+                frame.ms_mode != self.spectrum.ms_mode or
+                (frame.ms_mode and frame.ms_excitation != self.spectrum.ms_excitation)):
             return
         self.last_frame = frame
         if self.active_settings_dialog is not None:
@@ -774,7 +790,7 @@ class MainWindow(QMainWindow):
                 "last_export_directory": self.last_export_directory,
                 "editor": self.editor_state,
                 "show_cursor_values": self.cursor_values_action.isChecked(),
-                "ms_mode": self.ms_mode_action.isChecked(),
+                "ms_mode": self.spectrum.ms_mode, "ms_excitation": self.spectrum.ms_excitation,
                 "measurement": self.spectrum.measurement, "response_view": self.spectrum.response_view,
                 "settings": asdict(self.settings), "plot_range": self.spectrum.plot.getViewBox().viewRange()}
 
@@ -784,7 +800,10 @@ class MainWindow(QMainWindow):
         if not isinstance(state, dict):
             return
         if isinstance(state.get("ms_mode"), bool):
-            self.ms_mode_action.setChecked(state["ms_mode"])
+            excitation = state.get("ms_excitation", "interleaved")
+            if not isinstance(excitation, str) or excitation not in MS_EXCITATIONS:
+                excitation = "interleaved"
+            self._set_ms_mode(excitation if state["ms_mode"] else "off")
         if isinstance(state.get("show_cursor_values"), bool):
             self.cursor_values_action.setChecked(state["show_cursor_values"])
         if state.get("response_view") in self.view_actions:

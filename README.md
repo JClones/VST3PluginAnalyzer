@@ -33,9 +33,9 @@ main inputs; external sidechain inputs receive silence.
 
 Harmonic measurements use a sine aligned to an FFT bin, so the actual frequency
 may differ slightly from the requested one. Magnitude, phase and group delay
-measurements feed a unity impulse into the plugin. In M/S mode, a pair of impulse
-measurements measures the Mid and Side channels separately. Processing uses the
-plugin's supported precision; analysis uses 64-bit floating point precision.
+measurements feed a unity impulse into the plugin. M/S mode offers separate Mid
+and Side impulses or a single left-only/right-only impulse to derive both responses.
+Processing uses the plugin's supported precision; analysis uses 64-bit floating point precision.
 
 ## Install
 
@@ -250,11 +250,13 @@ two-finger scrolling to pan. Hold **Alt** while zooming to zoom only along the
 horizontal axis, or **Shift** to zoom only along the vertical axis.
 **Plot → Zoom Default** restores the default range;
 **Zoom Full** fits the data. **Show Cursor Values** displays values under the
-pointer. **M/S Mode** switches from Left/Right to Mid/Side display.
-In M/S mode, Frequency Response and Impulse Response measurements feed the plugin
-a Mid-only impulse followed by a Side-only impulse. Because these are processed
-in sequence, the Mid and Side plots may briefly be out of sync when plugin
-parameters change.
+pointer. **Plot → M/S Mode** offers three Mid/Side excitation modes for Frequency
+Response and Impulse Response: **Interleaved** alternates Mid-only and Side-only
+impulses; **Left only** and **Right only** use a unit impulse panned fully to the
+selected input and derive both plots from the same capture. One-sided responses
+are normalized to the injected Mid/Side components, so an unchanged signal path
+reads 0 dB in both plots. Interleaved plots may briefly be out of sync when plugin
+parameters change. Choose **Off (Left/Right)** to return to stereo display.
 
 **Plot → Store** keeps a curve for comparison while you change plugin settings.
 **Clear** removes stored curves. For frequency responses, **Make Reference**

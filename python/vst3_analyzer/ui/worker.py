@@ -44,6 +44,7 @@ class AnalyzerWorker(QThread):
         self.client = None
         self.forced = False
         self.executable = executable  # Native service path.
+        self.ms_excitation = "interleaved"
         self.ms_mode = False  # Select paired M/S excitation or continuous output decoding.
         self.measurement = "frequency"  # Initial desktop mode; saved sessions can override it.
         self.settings = settings  # Effective settings, replaced only inside the worker.
@@ -144,7 +145,7 @@ class AnalyzerWorker(QThread):
                                 if not parameter.get("flags", 0) & 2:
                                     dut.set_parameter(parameter["id"], parameter["value"])
                             active_plugin = {"path": info["path"], "class_id": info["class_id"]}
-                            stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode)
+                            stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode, self.ms_excitation)
                             has_editor, editor = self._prepare_editor(client, values.get("editor"))
                             rate_start = time.monotonic()
                             pacer = RealtimePacer(self.settings.sample_rate, rate_start)
@@ -156,6 +157,7 @@ class AnalyzerWorker(QThread):
                         elif operation in ("settings", "measurement", "ms_mode"):
                             if operation == "ms_mode":
                                 self.ms_mode = values["enabled"]
+                                self.ms_excitation = values.get("excitation", "interleaved")
                                 with self.frame_lock:
                                     self.latest_frame = None
                             elif operation == "measurement":
@@ -169,7 +171,7 @@ class AnalyzerWorker(QThread):
                                     self.latest_frame = None
                             if stream is not None:
                                 # Reconfigure only for deliberate settings changes, never parameter edits.
-                                stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode)
+                                stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode, self.ms_excitation)
                                 rate_start = time.monotonic()
                                 pacer = RealtimePacer(self.settings.sample_rate, rate_start)
                                 self.loaded.emit({"info": client.request("plugin_info"),
@@ -214,7 +216,7 @@ class AnalyzerWorker(QThread):
                             self.cleared.emit()
                             info = dut.load(plugin["path"], plugin["class_id"])
                             client.request("load_preset", path=values["path"])
-                            stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode)
+                            stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode, self.ms_excitation)
                             has_editor, editor = self._prepare_editor(client, editor_state)
                             rate_start = time.monotonic()
                             pacer = RealtimePacer(self.settings.sample_rate, rate_start)

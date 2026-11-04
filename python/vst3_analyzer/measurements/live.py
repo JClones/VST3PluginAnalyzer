@@ -10,7 +10,7 @@ from ..dsp.impulse import ImpulseResponse
 from ..dsp.noise import NoiseGenerator
 from ..dsp.spectrum import SpectrumResult, analyze_spectrum
 from .impulse import ImpulseCapture
-from .modes import GENERATORS, MEASUREMENTS
+from .modes import GENERATORS, MEASUREMENTS, MS_EXCITATIONS
 from ..dsp.generators import coherent_sine, nearest_bin
 from ..settings import MeasurementSettings
 
@@ -28,6 +28,7 @@ class LiveFrame:
     rate_fps: float = 0.0  # Worker-measured average frames per wall-clock second.
     measurement: str = "harmonic"  # Stimulus and spectrum normalization used for this record.
     ms_mode: bool = False  # Channels contain Mid/Side instead of Left/Right.
+    ms_excitation: str = "interleaved"  # Impulse routing used for this record.
 
 
 class RealtimePacer:
@@ -53,18 +54,22 @@ class RealtimePacer:
 class LiveAnalyzer:
     """Own continuous stimulus phase and a bounded rolling output record; never sleeps or owns UI."""
 
-    def __init__(self, dut, settings: MeasurementSettings, measurement="harmonic", ms_mode=False):
+    def __init__(self, dut, settings: MeasurementSettings, measurement="harmonic", ms_mode=False, ms_excitation="interleaved"):
         """Configure realtime processing and allocate capture history.
 
         Args:
             dut: Loaded processing device owned by the worker.
             settings: Immutable sample rate, FFT size, block size and precision settings.
             measurement: Selected impulse, harmonic or generator acquisition identifier.
-            ms_mode: Alternate Mid/Side impulses or decode continuous output into Mid/Side.
+            ms_mode: Decode output into Mid/Side.
+            ms_excitation: Interleaved Mid/Side impulses, or a left-only/right-only impulse.
         """
         # Live view retains processor history until an explicit load or settings change.
         if measurement not in MEASUREMENTS and measurement not in GENERATORS:
             raise ValueError("Unknown measurement")
+        if ms_excitation not in MS_EXCITATIONS:
+            raise ValueError("Unknown M/S excitation")
+        self.ms_excitation = ms_excitation
         self.ms_mode = bool(ms_mode)  # Requested M/S acquisition and output interpretation.
         self.ms_pending = None  # Mid response awaiting the following Side capture.
         self.ms_capture_index = 0  # Completed impulse origins, alternating Mid then Side.
@@ -121,9 +126,13 @@ class LiveAnalyzer:
             sine = (positions % (2 * self.settings.fft_size) == 0).astype(np.float64)
             audio = [sine] * self.channel_count
             if self.ms_mode and self.channel_count == 2:
-                # Alternate common and opposite-polarity impulses without changing the plugin instance.
-                polarity = np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0)
-                audio = [sine, sine * polarity]
+                if self.ms_excitation == "interleaved":
+                    # Alternate common and opposite-polarity impulses on the same plugin instance.
+                    polarity = np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0)
+                    audio = [sine, sine * polarity]
+                else:
+                    silence = np.zeros_like(sine)
+                    audio = [sine, silence] if self.ms_excitation == "left" else [silence, sine]
         elif self.generators:
             # Noise is independent per main-input channel; auxiliary buses remain silent in the native host.
             audio = [generator.generate(self.chunk_size) for generator in self.generators]
@@ -154,16 +163,27 @@ class LiveAnalyzer:
                 return None
             results, linked = captured
             if self.ms_mode:
-                # Select M→M and S→S independently; cross-conversion is deliberately excluded.
-                index = self.ms_capture_index % 2
-                self.ms_capture_index += 1
                 if len(results) == 2:
-                    decoded = (results[0].samples + (1 if index == 0 else -1) * results[1].samples) / 2
-                    selected = ImpulseResponse(results[0].times_ms, decoded)
-                    if index == 0:
-                        self.ms_pending = selected
-                        return None
-                    results, linked = (self.ms_pending, selected), False
+                    left, right = results[0].samples, results[1].samples
+                    times = results[0].times_ms
+                    if self.ms_excitation == "interleaved":
+                        # Select M→M and S→S independently; exclude cross-conversion.
+                        index = self.ms_capture_index % 2
+                        self.ms_capture_index += 1
+                        decoded = (left + (1 if index == 0 else -1) * right) / 2
+                        selected = ImpulseResponse(times, decoded)
+                        if index == 0:
+                            self.ms_pending = selected
+                            return None
+                        results = (self.ms_pending, selected)
+                    else:
+                        # A unit panned impulse has M=1/2 and S=+/-1/2. Divide each
+                        # decoded output by its injected component: unity remains 0 dB,
+                        # including Side polarity for right-only excitation.
+                        mid = left + right
+                        side = left - right if self.ms_excitation == "left" else right - left
+                        results = (ImpulseResponse(times, mid), ImpulseResponse(times, side))
+                    linked = False
                 else:
                     results, linked = (results[0],), True
                 if self.measurement == "frequency":
@@ -171,7 +191,7 @@ class LiveAnalyzer:
                     results = tuple(analyze_frequency_response(channel.samples[-self.settings.fft_size:],
                                                                self.settings.sample_rate) for channel in results)
             return LiveFrame(results, linked, 0.0, self.setup["processing_precision"], self.latency,
-                             self.samples_processed, measurement=self.measurement, ms_mode=self.ms_mode)
+                             self.samples_processed, measurement=self.measurement, ms_mode=self.ms_mode, ms_excitation=self.ms_excitation)
 
         # Exclude the initial latency prefix or a scheduled recovery interval without resetting the plugin.
         skip = max(0, self.valid_after - previous)
@@ -209,4 +229,4 @@ class LiveAnalyzer:
         self.since_update = 0
         return LiveFrame(results, linked, (self.bin_index * self.settings.sample_rate / self.settings.fft_size
                                            if self.measurement == "harmonic" else 0.0),
-                         self.setup["processing_precision"], self.latency, self.samples_processed, measurement=self.measurement, ms_mode=self.ms_mode)
+                         self.setup["processing_precision"], self.latency, self.samples_processed, measurement=self.measurement, ms_mode=self.ms_mode, ms_excitation=self.ms_excitation)
