@@ -38,7 +38,8 @@ plugins may need time to settle after changing parameters.
 **Window → Settings...** controls sample rate, FFT size, maximum processing block
 size, and the harmonic test's requested sine frequency and peak level. The actual
 sine is rounded to the nearest FFT bin to avoid windowing. Defaults are 44,100 Hz,
-8,192 samples, 1,000 Hz, and 0 dBFS. Precision is automatic: float64 plugin I/O if
+8,192 samples, 1,000 Hz, and 0 dBFS. The FFT size dropdown offers powers of two
+from 1,024 to 65,536 samples. Precision is automatic: float64 plugin I/O if
 supported, float32 otherwise, with float64 analysis and IPC. **Apply** updates the
 measurement and latency display without closing the dialog.
 

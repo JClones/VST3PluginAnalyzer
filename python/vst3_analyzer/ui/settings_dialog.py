@@ -37,10 +37,13 @@ class SettingsDialog(QDialog):
         self.rate.setEditable(True)
         self.rate.addItems(["44100", "48000", "88200", "96000", "176400", "192000"])
         self.rate.setCurrentText(f"{settings.sample_rate:g}")
-        self.size = QSpinBox()  # Even FFT length, independent of native processing block size.
-        self.size.setRange(32, 1048576)
-        self.size.setSingleStep(2)
-        self.size.setValue(settings.fft_size)
+        self.size = QComboBox()  # Fixed power-of-two choices, independent of processing block size.
+        fft_sizes = [2 ** exponent for exponent in range(10, 17)]
+        for size in fft_sizes:
+            self.size.addItem(str(size), size)
+        # Older settings files can contain other lengths; present the nearest allowed choice.
+        selected = min(fft_sizes, key=lambda size: abs(size - settings.fft_size))
+        self.size.setCurrentIndex(fft_sizes.index(selected))
         self.block = QSpinBox()  # Maximum configured native block size.
         self.block.setRange(1, 65536)
         self.block.setValue(settings.block_size)
@@ -91,7 +94,7 @@ class SettingsDialog(QDialog):
         # Keep the dialog open with a useful error when a value cannot produce a valid tone.
         try:
             self.result_settings = replace(self.original, sample_rate=float(self.rate.currentText()),
-                                           fft_size=self.size.value(), block_size=self.block.value(),
+                                           fft_size=self.size.currentData(), block_size=self.block.value(),
                                            precision="auto",
                                            frequency=self.frequency.value(),
                                            sine_level_dbfs=self.level.value())
