@@ -203,13 +203,6 @@ class MainWindow(QMainWindow):
         self.bypass_action.setEnabled(False)
         self.bypass_action.triggered.connect(self._set_bypass)
         plugins.addSeparator()
-        tests_menu = plugins.addMenu("Tests")
-        self.tests_menu = tests_menu  # Keep submenu wrappers alive with their parent window.
-        self.performance_action = tests_menu.addAction("Performance", self._run_performance)
-        self.performance_action.setShortcut("Ctrl+P")
-        self.performance_action.setMenuRole(QAction.NoRole)
-        self.performance_action.setEnabled(False)
-        self.addAction(self.performance_action)
         measurement = plugins.addMenu("Measurement")
         self.measurement_menu = measurement  # Keep submenu wrappers alive with their parent window.
         self.measurement_group = QActionGroup(self)  # Mutually exclusive measurement choices.
@@ -237,6 +230,13 @@ class MainWindow(QMainWindow):
             self.measurement_group.addAction(action)
             self.generator_actions[mode] = action
             action.triggered.connect(lambda checked=False, value=mode: self._select_measurement(value))
+        tests_menu = plugins.addMenu("Tests")
+        self.tests_menu = tests_menu  # Keep submenu wrappers alive with their parent window.
+        self.performance_action = tests_menu.addAction("Performance", self._run_performance)
+        self.performance_action.setShortcut("Ctrl+P")
+        self.performance_action.setMenuRole(QAction.NoRole)
+        self.performance_action.setEnabled(False)
+        self.addAction(self.performance_action)
         self.mode_actions = self.measurement_actions | self.generator_actions  # All persisted acquisition modes.
         self.program_menu = self.menuBar().addMenu("Program")  # Native state files and factory programs.
         self.load_preset_action = self.program_menu.addAction("Load...", self._load_preset)
@@ -267,15 +267,11 @@ class MainWindow(QMainWindow):
         self.reference_action = self.view_menu.addAction("Make Reference", self.spectrum.make_reference)
         self.clear_reference_action = self.view_menu.addAction("Clear Reference", self.spectrum.clear_reference)
         self.view_menu.addSeparator()
-        self.export_plot_action = self.view_menu.addAction("Export...", self._export_plot)
-        self.export_plot_action.setMenuRole(QAction.NoRole)
         for action, key in ((self.store_action, "F8"), (self.clear_plots_action, "F7"),
                             (self.reference_action, "F6"), (self.clear_reference_action, "F5")):
             action.setShortcut(key)
             action.setMenuRole(QAction.NoRole)
             self.addAction(action)
-        self.spectrum.comparison_state_changed.connect(self._update_comparison_actions)
-        self._update_comparison_actions()
         self.cursor_values_action = self.view_menu.addAction("Show Cursor Values")
         self.cursor_values_action.setCheckable(True)
         self.cursor_values_action.toggled.connect(self.spectrum.cursor.set_enabled)
@@ -293,6 +289,10 @@ class MainWindow(QMainWindow):
             self.ms_mode_actions[mode] = action
             action.triggered.connect(lambda _checked=False, selected=mode: self._set_ms_mode(selected))
         self.ms_mode_actions["off"].setChecked(True)
+        self.export_plot_action = self.view_menu.addAction("Export...", self._export_plot)
+        self.export_plot_action.setMenuRole(QAction.NoRole)
+        self.spectrum.comparison_state_changed.connect(self._update_comparison_actions)
+        self._update_comparison_actions()
         self.view_menu.addSeparator()
         self.zoom_in_action = self.view_menu.addAction("Zoom In", lambda: self.spectrum.zoom(0.8, QGuiApplication.queryKeyboardModifiers()))
         self.zoom_out_action = self.view_menu.addAction("Zoom Out", lambda: self.spectrum.zoom(1.25, QGuiApplication.queryKeyboardModifiers()))
