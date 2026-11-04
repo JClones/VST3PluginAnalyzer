@@ -290,6 +290,7 @@ class SpectrumView(QWidget):
         """Apply the units for the current measurement and selected representation."""
         # Harmonic spectra always retain their magnitude axis, independently of the saved response view.
         view = self.display_view()
+        self.plot.getAxis("left").set_phase_degrees(view in ("wrapped", "unwrapped"))
         # Wrapped phase is bounded; other representations retain unrestricted vertical navigation.
         self.plot.getViewBox().setLimits(yMin=-180 if view == "wrapped" else None,
                                          yMax=180 if view == "wrapped" else None)

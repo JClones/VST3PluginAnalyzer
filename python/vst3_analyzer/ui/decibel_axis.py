@@ -7,17 +7,25 @@ from PySide6.QtGui import QFontMetricsF
 
 
 class DecibelAxis(pg.AxisItem):
-    """Choose 1/2/5 decimal spacings for magnitudes, degrees or samples, labeling every line."""
+    """Choose readable magnitude/sample spacings or angular divisions, labeling every line."""
 
     def __init__(self, orientation="left", **kwargs):
         """Create a numeric axis; orientation selects its edge and kwargs configure AxisItem."""
         super().__init__(orientation=orientation, **kwargs)
+        self.phase_degrees = False
         # Every generated grid tick belongs to the primary labeled level.
         self.enableAutoSIPrefix(False)
         self.setStyle(maxTickLevel=0, maxTextLevel=0, hideOverlappingLabels=False)
 
+    def set_phase_degrees(self, enabled):
+        """Use phase-friendly angular divisions instead of the magnitude spacing sequence."""
+        if self.phase_degrees != enabled:
+            self.phase_degrees = enabled
+            self.picture = None
+            self.update()
+
     def tickValues(self, minVal, maxVal, size):
-        """Select a readable 1/2/5 step using the viewport height in logical pixels."""
+        """Select a readable step using the current units and viewport height in logical pixels."""
         # Aim for approximately 48 pixels between labels, refining as the view gets taller or zooms in.
         minimum, maximum = sorted((minVal, maxVal))
         span = maximum - minimum
@@ -28,8 +36,11 @@ class DecibelAxis(pg.AxisItem):
         # Extend the established coarse steps with decimal powers as far as float64 can distinguish.
         target = max(48 * (span / size), math.ulp(max(abs(minimum), abs(maximum))))
         exponent = max(-323, min(306, math.floor(math.log10(target))))
+        factors = (1, 3, 6, 9) if self.phase_degrees else (1, 2, 5)
         supported = [factor * 10.0 ** power for power in range(max(-323, exponent - 1), exponent + 2)
-                     for factor in (1, 2, 5)]
+                     for factor in factors]
+        if self.phase_degrees:
+            supported.extend((15, 30, 45, 60, 90, 180, 360))
         resolution = math.ulp(max(abs(minimum), abs(maximum)))
         candidates = [step for step in supported if step >= resolution and step / span * size >= minimum_gap]
         step = min(candidates or [target], key=lambda value: abs(value / span * size - 48))
