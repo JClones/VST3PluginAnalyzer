@@ -131,7 +131,7 @@ def repair_svg_clipping(root, definitions, widget, trace_colors):
             parent.insert(position, wrapper)
 
 
-def finalize_svg(path, widget):
+def finalize_svg(path, widget, opacity_gradients=()):
     """Set pixel dimensions and restore gradient strokes omitted by Qt's SVG writer.
 
     Args:
@@ -165,7 +165,7 @@ def finalize_svg(path, widget):
     live_colors = {curve.opts["pen"].color().name() for curve in (widget.linked, widget.left, widget.right)}
     if widget.cursor.line.isVisible():
         live_colors.add(widget.cursor.line.pen.color().name())
-    repair_svg_clipping(root, definitions, widget, colors | live_colors)
+    repair_svg_clipping(root, definitions, widget, colors | live_colors | {tag for tag, _ in opacity_gradients})
     left, right = widget.plot.getViewBox().viewRange()[0]
     for index, color in enumerate(sorted(colors)):
         identifier = f"stored-edge-fade-{index}"
@@ -179,6 +179,19 @@ def finalize_svg(path, widget):
         for element in root.iter():
             if element.get("stroke") == color:
                 element.set("stroke", f"url(#{identifier})")
+    for index, (tag, (left, right, stops)) in enumerate(opacity_gradients):
+        identifier = f"phase-opacity-{index}"
+        gradient = ET.SubElement(definitions, f"{{{namespace}}}linearGradient", {
+            "id": identifier, "gradientUnits": "userSpaceOnUse",
+            "x1": format(left, ".17g"), "x2": format(right, ".17g"), "y1": "0", "y2": "0"})
+        for position, color in stops:
+            ET.SubElement(gradient, f"{{{namespace}}}stop", {
+                "offset": format(position, ".17g"), "stop-color": color.name(),
+                "stop-opacity": format(color.alphaF(), ".9g")})
+        for element in root.iter():
+            if element.get("stroke") == tag:
+                element.set("stroke", f"url(#{identifier})")
+                element.set("stroke-opacity", "1")
     tree.write(path, encoding="utf-8", xml_declaration=True)
 
 
@@ -220,13 +233,30 @@ def save_plot(widget, destination, traces, view):
             painter = QPainter()
             if not painter.begin(generator):
                 raise OSError("Could not create SVG image")
+            originals, opacity_gradients = [], []
             try:
+                # Qt's SVG writer drops cosmetic gradient pens. Distinct temporary
+                # colors identify each curve, including same-color stored captures,
+                # so its exact combined opacity can be restored in the SVG.
+                from PySide6.QtGui import QColor, QPen
+                for item in widget.plot.getPlotItem().items:
+                    gradient = getattr(item, "opacity_gradient", None)
+                    if not item.isVisible() or gradient is None or getattr(item, "phase_opacity_data", None) is None:
+                        continue
+                    originals.append((item, QPen(item.opts["pen"])))
+                    color = QColor.fromRgb(0x010000 + len(originals))
+                    pen = QPen(item.opts["pen"])
+                    pen.setColor(color)
+                    item.setPen(pen)
+                    opacity_gradients.append((color.name(), gradient))
                 painter.fillRect(widget.rect(), Qt.white)
                 painter.setRenderHint(QPainter.Antialiasing)
                 widget.plot.render(painter, QRectF(widget.plot.geometry()), widget.plot.viewport().rect())
             finally:
                 painter.end()
-            finalize_svg(temporary, widget)
+                for item, pen in originals:
+                    item.setPen(pen)
+            finalize_svg(temporary, widget, opacity_gradients)
         else:
             raise ValueError("Unsupported plot export format")
         if temporary.stat().st_size == 0:

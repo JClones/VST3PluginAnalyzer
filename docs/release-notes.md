@@ -8,6 +8,8 @@ response with latency compensation.
 - Added a configurable **Phase calculation threshold** in Settings. Phase and
   group delay below the threshold are omitted at the response edges; bounded gaps
   use dashed interpolation. Magnitude measurements remain available below it.
+- Phase and group-delay curves fade near the threshold according to original
+  response levels, including when a reference is active.
 - Added independent **M/S Mode** and **Channels** controls. Left-only and
   right-only excitation works with stereo or M/S analysis, including stereo
   crosstalk measurements.

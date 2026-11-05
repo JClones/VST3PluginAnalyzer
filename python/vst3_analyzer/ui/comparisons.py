@@ -6,9 +6,9 @@ from dataclasses import dataclass
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QLinearGradient
 
 from .phase_curve import phase_paths
+from .phase_opacity import apply_opacity, phase_linked, set_phase_opacity
 from .plot_strokes import register_stroke, set_curve_rendering
 
 TRACE_COLORS = ("#ff00ff", "#0000f5", "#ea3323")  # Linked/mono, left and right colors shared by live and stored traces.
@@ -65,18 +65,7 @@ def fade_stored_curve(curve, left, right):
         right: Visible right boundary in logarithmic plot coordinates.
     """
     # A logical-coordinate brush follows the plot transform, so fades track screen width during zoom/pan.
-    color = pg.mkColor(curve.property("storedColor"))
-    color.setAlpha(curve.property("storedAlpha"))
-    transparent = pg.mkColor(color)
-    transparent.setAlpha(0)
-    gradient = QLinearGradient(left, 0, right, 0)
-    for position, tint in ((0, transparent), (0.05, color), (0.95, color), (1, transparent)):
-        gradient.setColorAt(position, tint)
-    brush = QBrush(gradient)
-    brush.setColor(color)
-    pen = pg.mkPen(curve.opts["pen"])
-    pen.setBrush(brush)
-    curve.setPen(pen)
+    apply_opacity(curve, left, right, edge_fade=True)
 
 
 def add_stored_curve(plot, x, y, pen, measurement, connect="finite"):
@@ -161,21 +150,24 @@ def render_stored_response(plot, stored, view):
         curve.hide()
         plot.removeItem(curve)
     curves = []
-    channels = stored.responses[:1] if stored.linked else stored.responses
+    linked = phase_linked(stored.responses, stored.linked, view)
+    channels = stored.responses[:1] if linked else stored.responses
     for index, channel in enumerate(channels):
         frequency = channel.frequencies_hz[1:]
         values = display_values(channel, view)[1:]
-        pen = pg.mkPen(MS_COLORS[index] if stored.ms_mode else TRACE_COLORS[0 if stored.linked else index + 1])
+        pen = pg.mkPen(MS_COLORS[index] if stored.ms_mode else TRACE_COLORS[0 if linked else index + 1])
         if view in ("wrapped", "unwrapped", "delay"):
             # Preserve estimated gaps and phase-wrap decoration in frozen captures too.
             solid_x, solid_y, connector_x, connector_y = response_phase_paths(channel, view, values)
             curves.append(add_stored_curve(plot, solid_x, solid_y, pen, "frequency"))
+            set_phase_opacity(curves[-1], channel, view)
             if connector_x.size:
                 pen.setStyle(Qt.DashLine)
                 color = pen.color()
                 color.setAlphaF(0.35)
                 pen.setColor(color)
                 curves.append(add_stored_curve(plot, connector_x, connector_y, pen, "frequency"))
+                set_phase_opacity(curves[-1], channel, view)
         else:
             curves.append(add_stored_curve(plot, frequency, values, pen, "frequency"))
     stored.curves = tuple(curves)

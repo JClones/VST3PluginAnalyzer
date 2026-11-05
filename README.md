@@ -39,6 +39,7 @@ Frequency-response measurements retain pre-ringing and the impulse tail during
 the recovery interval; reported latency is compensated without discarding samples.
 Processing uses the plugin's supported precision; analysis uses 64-bit floating point precision.
 Phase and group delay use an adjustable validity threshold (−160 dB by default),
+fade toward that threshold according to the original response level,
 omit unsupported edge ranges and interpolate bounded gaps, marking estimates with dashed lines. Magnitude measurements retain
 their full range. See the [usage guide](docs/usage.md#phase-and-group-delay) for details.
 

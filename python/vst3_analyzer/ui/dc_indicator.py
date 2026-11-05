@@ -6,6 +6,7 @@ import pyqtgraph as pg
 from PySide6.QtCore import Qt
 
 from .plot_strokes import register_stroke
+from .phase_opacity import apply_opacity
 
 
 class DcIndicator:
@@ -43,7 +44,7 @@ class DcIndicator:
         (left, right), (bottom, top) = box.viewRange()
         edge = left + 4 * (right-left) / max(1, box.width())  # Keep the symbol clear of the plot border.
         visible = False
-        for (frequency, dc, first, source_pen), (line, marker) in zip(self.records, self.items):
+        for (frequency, dc, first, source_pen, opacity), (line, marker) in zip(self.records, self.items):
             x = np.log10(frequency)
             shown = bool(left - 1e-12 <= x)  # Keep the connector when bin one is off-screen to the right.
             visible |= shown
@@ -60,11 +61,18 @@ class DcIndicator:
             if np.isfinite(dc):
                 y = float(np.clip(dc, bottom, top))
                 symbol = "t" if dc < bottom else "t1" if dc > top else "o"
-                marker.setData([edge], [y], symbol=symbol, pen=pen, brush=pg.mkBrush(pen.color()))
+                color = pg.mkColor(pen.color())
+                if opacity is not None:
+                    color.setAlphaF(color.alphaF() * float(opacity[0]))
+                marker.setData([edge], [y], symbol=symbol, pen=pg.mkPen(color), brush=pg.mkBrush(color))
                 marker.show()
                 if np.isfinite(first):
                     # Keep actual endpoints: the viewport clips connectors to off-screen DC values.
                     line.setData([edge, x], [dc, first], connect="finite")
+                    order = np.argsort([edge, x])
+                    line.phase_opacity_data = ((np.array([edge, x])[order], np.asarray(opacity)[order])
+                                                if opacity is not None else None)
+                    apply_opacity(line, left, right)
                     line.show()
         self.label.setVisible(visible)
         self.label.setPos(edge, bottom)

@@ -66,7 +66,7 @@ class SettingsDialog(QDialog):
         self.phase_threshold.setSingleStep(10)
         self.phase_threshold.setSuffix(" dB")
         self.phase_threshold.setValue(settings.phase_threshold_db)
-        self.phase_threshold.setToolTip("Phase and group delay below this magnitude are treated as unknown. Magnitude is unchanged.")
+        self.phase_threshold.setToolTip("Phase and group delay fade toward this threshold; lower levels are treated as unknown. Magnitude is unchanged.")
         frequency_response = QGroupBox("Frequency Response Test")
         response_layout = QFormLayout(frequency_response)
         response_layout.addRow("Phase calculation threshold", self.phase_threshold)

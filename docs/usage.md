@@ -53,6 +53,14 @@ reference plots without discarding their measurements.
 
 ## Phase and group delay
 
+Phase and group-delay curves fade as the original response level approaches the
+threshold. With the default −160 dB setting, opacity is 100% at −80 dB and above,
+75% at −120 dB, and 50% at −160 dB. This indicates proximity to the low-level
+region, rather than a measured confidence level. For reference-relative curves,
+the weaker original current/reference response controls the fade, regardless of
+the ratio's magnitude. Stored curves and dashed estimates multiply this fade by
+their existing transparency. Magnitude curves and numeric values are unchanged.
+
 Phase analysis treats magnitudes below the configured threshold as unknown, without changing the
 magnitude measurement or its display. An isolated missing bin or a longer gap
 bounded by valid phase is interpolated along the shortest phase arc. These

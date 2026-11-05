@@ -18,6 +18,7 @@ from .plot_export import ExportTrace
 from .plot_cursor import PlotCursor
 from .navigation import AnalyzerPlotWidget, AnalyzerViewBox
 from .plot_strokes import register_stroke, set_curve_rendering
+from .phase_opacity import apply_opacity, phase_linked, phase_opacity, set_phase_opacity
 from ..dsp.distortion import combine_distortion
 from ..dsp.response import relative_response
 from ..measurements.modes import GENERATORS, MEASUREMENTS, SPECTRUM_MODES
@@ -148,6 +149,9 @@ class SpectrumView(QWidget):
     def _update_stored_fades(self):
         """Keep stored curves' edge fades aligned with the visible logarithmic frequency interval."""
         left, right = self.plot.getViewBox().viewRange()[0]
+        for curve in (self.linked, self.left, self.right, *self.wrap_connections):
+            if curve.isVisible() and getattr(curve, "phase_opacity_data", None) is not None:
+                apply_opacity(curve, left, right)
         for stored in self.stored_plots:
             for curve in stored.curves:
                 fade_stored_curve(curve, left, right)
@@ -165,15 +169,18 @@ class SpectrumView(QWidget):
                 for channel, curve in zip(channels, curves):
                     values = display_values(channel, view)
                     live_values.append(values[0])
-                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"]))
+                    opacity = phase_opacity(channel)[:2] if view != "magnitude" else None
+                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"], opacity))
             for stored in self.stored_plots:
                 if stored.measurement != "frequency":
                     continue
-                channels = stored.responses[:1] if stored.linked else stored.responses
+                linked = phase_linked(stored.responses, stored.linked, view)
+                channels = stored.responses[:1] if linked else stored.responses
                 curves = [curve for curve in stored.curves if curve.opts["pen"].style() != Qt.DashLine]
                 for channel, curve in zip(channels, curves):
                     values = display_values(channel, view)
-                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"]))
+                    opacity = phase_opacity(channel)[:2] if view != "magnitude" else None
+                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"], opacity))
         self.dc_indicator.set_data(records, live_values)
 
     def set_phase_threshold(self, threshold_db):
@@ -291,7 +298,8 @@ class SpectrumView(QWidget):
                 channels = (stored.responses if stored.measurement == "frequency" else
                             stored.impulse_channels if stored.measurement == "impulse" else stored.harmonic_channels)
                 if channels:
-                    add_channels(f"Stored {index}", channels, stored.linked, stored.ms_mode)
+                    linked = phase_linked(channels, stored.linked, view) if stored.responses else stored.linked
+                    add_channels(f"Stored {index}", channels, linked, stored.ms_mode)
         return traces
 
     def clear_stored(self):
@@ -550,6 +558,8 @@ class SpectrumView(QWidget):
                 linked = len(channels) == 1 or np.array_equal(channels[0].spectrum, channels[1].spectrum, equal_nan=True)
         if frame.ms_mode and len(channels) == 2:
             linked = False
+        if frame.measurement == "frequency":
+            linked = phase_linked(channels, linked, self.display_view())
         return channels, linked
 
     def show_frame(self, frame):
@@ -605,6 +615,8 @@ class SpectrumView(QWidget):
         phase_view = self.measurement == "frequency" and view in ("wrapped", "unwrapped", "delay")
         for (curve, overlay, values), channel in zip(active, channels):
             set_curve_rendering(curve, values, self.measurement)
+            set_phase_opacity(curve, channel, view if self.measurement == "frequency" else "magnitude")
+            set_phase_opacity(overlay, channel, view if self.measurement == "frequency" else "magnitude")
             if phase_view:
                 # Measured samples remain solid; bounded estimates and wrap legs are dashed.
                 solid_x, solid_y, connector_x, connector_y = response_phase_paths(channel, view, values)
