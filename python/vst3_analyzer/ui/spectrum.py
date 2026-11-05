@@ -339,13 +339,15 @@ class SpectrumView(QWidget):
         box.zoom_touchpad(factor, box.viewRect().center(), modifiers)
 
     def zoom_full(self, fft_size):
-        """Fit non-DC FFT bins and finite Y values, with a -200 dB harmonic floor.
+        """Fit non-DC FFT bins and finite Y values, with a -200 dB measurement magnitude floor.
 
         Args:
             fft_size: Current measurement record length, used to locate FFT bin one.
         """
         # Fit measured traces, excluding the decorative wrap connectors and undefined bins.
         low, high = self.default_y_range()
+        magnitude_floor = (self.measurement == "harmonic" or
+                           (self.measurement == "frequency" and self.response_view == "magnitude"))
         finite = []
         stored_curves = [curve for stored in self.stored_plots for curve in stored.curves]
         x_range = (float(np.log10(2 * self.nyquist / fft_size)), float(np.log10(self.nyquist)))
@@ -372,7 +374,7 @@ class SpectrumView(QWidget):
                 finite.append((float(values.min()), float(values.max())))
         if finite:
             minimum = min(item[0] for item in finite)
-            if self.measurement == "harmonic":
+            if magnitude_floor:
                 minimum = max(minimum, -200.0)
             maximum = max(item[1] for item in finite)
             if maximum - minimum >= high - low:
@@ -390,7 +392,7 @@ class SpectrumView(QWidget):
             margin = (high - low) * stroke_margin / (height - 2 * stroke_margin)
             low = min(low, minimum - margin)
             high = max(high, maximum + margin)
-        if self.measurement == "harmonic":
+        if magnitude_floor:
             # Numerical FFT residuals and stroke padding must not push Full below its display floor.
             low = max(low, -200.0)
         self.plot.getViewBox().setRange(xRange=x_range, yRange=(low, high), padding=0)

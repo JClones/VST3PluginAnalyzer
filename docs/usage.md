@@ -93,7 +93,8 @@ Analyzer. Activate an analyzer window before using its shortcuts.
 - Right-drag or two-finger scroll to pan. Pinch to zoom both axes.
 - Shift constrains zoom to Y; Alt constrains zoom to X. The same modifiers apply
   to the Zoom In/Out keyboard commands.
-- **Zoom Full** fits the data, using at least the default vertical span.
+- **Zoom Full** fits the data, using at least the default vertical span. Harmonic
+  and frequency-response magnitude views stop at −200 dB; manual zoom remains unrestricted.
 - **Show Cursor Values** displays a dashed crosshair and current trace values.
 
 Default frequency bounds start at the next multiple of 5 Hz strictly above FFT
