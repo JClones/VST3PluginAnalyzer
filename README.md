@@ -257,7 +257,10 @@ two-finger scrolling to pan. Hold **Alt** while zooming to zoom only along the
 horizontal axis, or **Shift** to zoom only along the vertical axis.
 **Plot → Zoom Default** restores the default range;
 **Zoom Full** fits the data. **Show Cursor Values** displays values under the
-pointer. **Plot → M/S Mode** switches between stereo Left/Right and Mid/Side
+pointer. When the viewport starts at or below the first FFT bin, a **DC** marker at the left edge
+shows the zero-Hz response, with a dashed connector to the first bin. Use
+**Zoom Full** to reveal it and **Show Cursor Values** to inspect its value.
+**Plot → M/S Mode** switches between stereo Left/Right and Mid/Side
 output analysis. **Plot → Channels** independently selects **Left and right**
 (the default), **Left only**, or **Right only** for the test input.
 

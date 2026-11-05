@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from .comparisons import MS_COLORS, TRACE_COLORS, capture_response, copy_plot, display_values, fade_stored_curve, render_stored_response, response_phase_paths
 from .decibel_axis import DecibelAxis
+from .dc_indicator import DcIndicator
 from .frequency_axis import FrequencyAxis
 from .time_axis import TimeAxis
 from .impulse_curve import ImpulseCurveRenderer
@@ -120,6 +121,7 @@ class SpectrumView(QWidget):
             curve.curve.setCompositionMode(QPainter.CompositionMode_SourceOver)
             curve.setDynamicRangeLimit(2.0, hysteresis=1.0)
             curve.curve.setSegmentedLineMode("on")
+        self.dc_indicator = DcIndicator(self.plot, self.cursor)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 6, 12, 0)
         layout.addWidget(self.plot)
@@ -149,6 +151,30 @@ class SpectrumView(QWidget):
         for stored in self.stored_plots:
             for curve in stored.curves:
                 fade_stored_curve(curve, left, right)
+
+    def _update_dc(self):
+        """Retain real DC data separately from positive-frequency plot coordinates."""
+        records, live_values = [], None
+        if self.measurement == "frequency":
+            view = self.display_view()
+            if self.latest_frame is not None:
+                channels, linked = self._display_channels(self.latest_frame)
+                channels = channels[:1] if linked else channels
+                curves = (self.linked,) if linked else (self.left, self.right)
+                live_values = []
+                for channel, curve in zip(channels, curves):
+                    values = display_values(channel, view)
+                    live_values.append(values[0])
+                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"]))
+            for stored in self.stored_plots:
+                if stored.measurement != "frequency":
+                    continue
+                channels = stored.responses[:1] if stored.linked else stored.responses
+                curves = [curve for curve in stored.curves if curve.opts["pen"].style() != Qt.DashLine]
+                for channel, curve in zip(channels, curves):
+                    values = display_values(channel, view)
+                    records.append((channel.frequencies_hz[1], values[0], values[1], curve.opts["pen"]))
+        self.dc_indicator.set_data(records, live_values)
 
     def set_phase_threshold(self, threshold_db):
         """Recalculate live, stored and reference phase without discarding captured measurements."""
@@ -231,6 +257,7 @@ class SpectrumView(QWidget):
             stored.linked = self.latest_frame.linked
         stored.ms_mode = self.ms_mode
         self.stored_plots.append(stored)
+        self._update_dc()
         self._update_impulse_curves()
         self.comparison_state_changed.emit()
 
@@ -273,6 +300,7 @@ class SpectrumView(QWidget):
             for curve in stored.curves:
                 self.plot.removeItem(curve)
         self.stored_plots.clear()
+        self._update_dc()
         self.comparison_state_changed.emit()
 
     def make_reference(self):
@@ -300,6 +328,7 @@ class SpectrumView(QWidget):
                 render_stored_response(self.plot, stored, view)
             for curve in stored.curves:
                 curve.setVisible(visible)
+        self._update_dc()
         self._update_impulse_curves()
 
     def _update_vertical_axis(self):
@@ -368,6 +397,8 @@ class SpectrumView(QWidget):
         else:
             arrays = [curve.yData for curve in (self.linked, self.left, self.right, *stored_curves)
                       if curve.isVisible() and curve.yData is not None]
+            if self.measurement == "frequency":
+                arrays.append(np.array([record[1] for record in self.dc_indicator.records]))
         for array in arrays:
             values = array[np.isfinite(array)]
             if values.size:

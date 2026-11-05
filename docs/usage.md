@@ -97,6 +97,16 @@ Analyzer. Activate an analyzer window before using its shortcuts.
   and frequency-response magnitude views stop at −200 dB; manual zoom remains unrestricted.
 - **Show Cursor Values** displays a dashed crosshair and current trace values.
 
+When the viewport starts at or below the first positive FFT bin in Frequency Response, a **DC** marker
+appears at the left plot edge with a dashed connection to that bin. The marker
+represents the measured **0 Hz** value; the connector is a visual guide across
+the gap. Enable **Show Cursor Values** and move the cursor to the DC marker's
+horizontal position at any height to inspect DC.
+The connector remains visible when that bin is off-screen to the right, and
+disappears when the viewport starts beyond it. Off-scale DC
+values use an edge indicator; zero magnitude reads −∞ dB, and unsupported phase
+or group delay reads undefined. Stored curves retain their DC markers too.
+
 Default frequency bounds start at the next multiple of 5 Hz strictly above FFT
 bin one and end at Nyquist. Harmonic magnitude defaults to approximately 0 to
 −200 dB, frequency-response magnitude to −20 to +20 dB, impulse response to −1

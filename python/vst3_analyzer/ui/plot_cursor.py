@@ -21,6 +21,7 @@ class PlotCursor(QObject):
         self.enabled = False  # User preference, independent of available measurement data.
         self.position = None  # Last scene position while the mouse remains inside the viewport.
         self.data = None  # Frequency bins, channel values, linkage and selected representation.
+        self.dc_data = None  # Actual DC values and boundary X.
         # Longer explicit dashes remain distinct from dots on high-resolution displays.
         guide_pen = pg.mkPen('#333333', width=0.75)
         guide_pen.setDashPattern([8, 5])
@@ -59,11 +60,18 @@ class PlotCursor(QObject):
     def set_data(self, coordinates, values, linked, view):
         """Cache coordinates (Hz or ms), displayed channel values, linkage and view identifier."""
         self.data = (coordinates if view == 'impulse' else np.log10(coordinates), values, linked, view)
+        self.dc_data = None
+        self.refresh()
+
+    def set_dc_data(self, values, x):
+        """Expose actual zero-Hz values only at the explicitly labelled DC annotation."""
+        self.dc_data = (values, x) if values is not None else None
         self.refresh()
 
     def clear(self):
         """Discard measurement values while retaining the tracking preference."""
         self.data = None
+        self.dc_data = None
         self.refresh()
 
     def refresh(self):
@@ -80,12 +88,21 @@ class PlotCursor(QObject):
         # Interpolate in logarithmic X to match the straight segments drawn between FFT bins.
         x = box.mapSceneToView(self.position).x()
         bins, channels, linked, view = self.data
+        dc_values = None
+        if self.dc_data is not None:
+            values, edge = self.dc_data
+            xmin, xmax = box.viewRange()[0]
+            if abs(x-edge) <= 9 * (xmax-xmin) / max(1, box.width()):
+                dc_values, x = values, edge
         self.line.setPos(x)
         unit = {'magnitude': 'dB', 'wrapped': '°', 'unwrapped': '°', 'delay': 'samples', 'impulse': ''}[view]
         time = 0.0 if abs(x) < 0.0005 else x  # Suppress a negative zero caused by scene-coordinate rounding.
-        rows = [f'{time:.3f} ms' if view == 'impulse' else f'{10 ** x:.3f} Hz']
+        rows = ['DC (0 Hz)' if dc_values is not None else
+                f'{time:.3f} ms' if view == 'impulse' else f'{10 ** x:.3f} Hz']
         for index, values in enumerate(channels[:1] if linked else channels):
-            if view == 'impulse' and len(bins) > 1 and box.viewRange()[0][1] - box.viewRange()[0][0] < RECONSTRUCTION_SPAN_MS:
+            if dc_values is not None:
+                value = dc_values[index]
+            elif view == 'impulse' and len(bins) > 1 and box.viewRange()[0][1] - box.viewRange()[0][0] < RECONSTRUCTION_SPAN_MS:
                 # Evaluate the same continuous waveform at the exact pointer time, rather than rounding to display points.
                 position = (x - bins[0]) / (bins[1] - bins[0])
                 value = SincInterpolator(np.array([position])).evaluate(values)[0]

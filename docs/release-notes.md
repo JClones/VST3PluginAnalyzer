@@ -19,6 +19,8 @@ response with latency compensation.
   on focus, and background refreshes preserve selection and unfinished edits.
 - FFT size is now selected from powers of two between 1024 and 65536.
 - Improved phase grid spacing and reordered the Plugin and Plot menus.
+- Added a DC marker and zero-Hz cursor readout when the viewport includes the
+  interval leading up to the first frequency-response bin.
 
 ## Brief description
 
