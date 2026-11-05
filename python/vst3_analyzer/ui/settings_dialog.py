@@ -2,9 +2,47 @@
 # SPDX-License-Identifier: MIT
 """Desktop editor for the shared validated measurement settings."""
 from dataclasses import replace
+import math
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QDoubleValidator, QValidator
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QDoubleSpinBox, QFormLayout, QGroupBox, QLabel, QMessageBox, QSpinBox, QWidget)
+                               QAbstractSpinBox, QDoubleSpinBox, QFormLayout, QGroupBox, QLabel, QMessageBox, QSpinBox, QWidget)
+
+
+class DeferredDoubleSpinBox(QDoubleSpinBox):
+    """Allow incomplete numeric replacements; enforce bounds when editing finishes."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setKeyboardTracking(False)
+        self.setCorrectionMode(QAbstractSpinBox.CorrectToPreviousValue)
+
+    def _number_text(self, text):
+        if self.prefix() and text.startswith(self.prefix()):
+            text = text[len(self.prefix()):]
+        if self.suffix() and text.endswith(self.suffix()):
+            text = text[:-len(self.suffix())]
+        return text.strip()
+
+    def fixup(self, text):
+        """Clamp completed out-of-range numbers; restore the last value for empty input."""
+        value, valid = self.locale().toDouble(self._number_text(text))
+        if not valid or not math.isfinite(value):
+            value = self.value()
+        value = min(self.maximum(), max(self.minimum(), value))
+        return self.prefix() + self.textFromValue(value) + self.suffix()
+
+    def validate(self, text, position):
+        state, formatted, cursor = super().validate(text, position)
+        if state != QValidator.Invalid:
+            return state, formatted, cursor
+        validator = QDoubleValidator()
+        validator.setLocale(self.locale())
+        validator.setDecimals(self.decimals())
+        validator.setNotation(QDoubleValidator.StandardNotation)
+        if validator.validate(self._number_text(text), 0)[0] != QValidator.Invalid:
+            return QValidator.Intermediate, text, position
+        return state, formatted, cursor
 
 
 class FrequencySpinBox(QDoubleSpinBox):
@@ -60,7 +98,7 @@ class SettingsDialog(QDialog):
         harmonic_layout = QFormLayout(harmonic)
         harmonic_layout.addRow("Sine Frequency, Hz", self.frequency)
         harmonic_layout.addRow("Sine Level, dBFS", self.level)
-        self.phase_threshold = QDoubleSpinBox()
+        self.phase_threshold = DeferredDoubleSpinBox()
         self.phase_threshold.setRange(-200, -40)
         self.phase_threshold.setDecimals(1)
         self.phase_threshold.setSingleStep(10)
@@ -104,6 +142,7 @@ class SettingsDialog(QDialog):
         """Read and validate edited controls, returning whether settings can be applied."""
         # Keep the dialog open with a useful error when a value cannot produce a valid tone.
         try:
+            self.phase_threshold.interpretText()
             self.result_settings = replace(self.original, sample_rate=float(self.rate.currentText()),
                                            fft_size=self.size.currentData(), block_size=self.block.value(),
                                            precision="auto",
