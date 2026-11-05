@@ -257,13 +257,18 @@ two-finger scrolling to pan. Hold **Alt** while zooming to zoom only along the
 horizontal axis, or **Shift** to zoom only along the vertical axis.
 **Plot → Zoom Default** restores the default range;
 **Zoom Full** fits the data. **Show Cursor Values** displays values under the
-pointer. **Plot → M/S Mode** offers three Mid/Side excitation modes for Frequency
-Response and Impulse Response: **Interleaved** alternates Mid-only and Side-only
-impulses; **Left only** and **Right only** use a unit impulse panned fully to the
-selected input and derive both plots from the same capture. One-sided responses
-are normalized to the injected Mid/Side components, so an unchanged signal path
-reads 0 dB in both plots. Interleaved plots may briefly be out of sync when plugin
-parameters change. Choose **Off (Left/Right)** to return to stereo display.
+pointer. **Plot → M/S Mode** switches between stereo Left/Right and Mid/Side
+output analysis. **Plot → Channels** independently selects **Left and right**
+(the default), **Left only**, or **Right only** for the test input.
+
+In stereo mode, Left and right feeds both inputs; Left only or Right only feeds
+just that input while both outputs are measured, allowing inspection of channel
+crosstalk. In M/S mode, Frequency Response and Impulse Response alternate Mid-only
+and Side-only impulses when Left and right is selected; these two plots may briefly
+be out of sync after parameter changes. Left only and Right only derive both M/S
+plots from one capture, normalized to the injected Mid/Side components so an
+unchanged signal path reads 0 dB in both frequency plots. Channel selection also
+applies to the harmonic test and signal generators.
 
 **Plot → Store** keeps a curve for comparison while you change plugin settings.
 **Clear** removes stored curves. For frequency responses, **Make Reference**

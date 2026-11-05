@@ -524,7 +524,7 @@ class SpectrumView(QWidget):
         # DC is excluded from the logarithmic axis; zero handling does not alter analysis data.
         channels = frame.channels
         if (frame.measurement != self.measurement or frame.ms_mode != self.ms_mode or
-                (self.ms_mode and frame.ms_excitation != self.ms_excitation)):
+                (frame.ms_excitation != self.ms_excitation)):
             return  # Ignore an already queued frame from the previous measurement.
         self.latest_frame = frame
         channels, linked = self._display_channels(frame)

@@ -7,7 +7,7 @@ from dataclasses import replace
 import sys
 import logging
 from pathlib import Path
-from PySide6.QtCore import QByteArray, QEvent, Qt, QTimer
+from PySide6.QtCore import QSignalBlocker, QByteArray, QEvent, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QFont, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMainWindow, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 
@@ -21,7 +21,7 @@ from .plugin_dialog import PluginDirectoryDialog
 from .spectrum import SpectrumView
 from .worker import AnalyzerWorker
 from ..settings import MeasurementSettings
-from ..measurements.modes import GENERATORS, MEASUREMENTS, MS_EXCITATIONS
+from ..measurements.modes import GENERATORS, MEASUREMENTS, INPUT_CHANNELS
 
 
 class MainWindow(QMainWindow):
@@ -276,20 +276,21 @@ class MainWindow(QMainWindow):
         self.cursor_values_action = self.view_menu.addAction("Show Cursor Values")
         self.cursor_values_action.setCheckable(True)
         self.cursor_values_action.toggled.connect(self.spectrum.cursor.set_enabled)
-        self.ms_mode_menu = self.view_menu.addMenu("M/S Mode")
-        self.ms_mode_group = QActionGroup(self)
-        self.ms_mode_group.setExclusive(True)
-        self.ms_mode_actions = {}
-        for mode, label in {"off": "Off (Left/Right)", **MS_EXCITATIONS}.items():
-            if mode == "interleaved":
-                self.ms_mode_menu.addSeparator()
-            action = self.ms_mode_menu.addAction(label)
+        self.ms_mode_action = self.view_menu.addAction("M/S Mode")
+        self.ms_mode_action.setCheckable(True)
+        self.ms_mode_action.toggled.connect(self._set_ms_mode)
+        self.channels_menu = self.view_menu.addMenu("Channels")
+        self.channels_group = QActionGroup(self)
+        self.channels_group.setExclusive(True)
+        self.channel_actions = {}
+        for mode, label in INPUT_CHANNELS.items():
+            action = self.channels_menu.addAction(label)
             action.setCheckable(True)
             action.setData(mode)
-            self.ms_mode_group.addAction(action)
-            self.ms_mode_actions[mode] = action
-            action.triggered.connect(lambda _checked=False, selected=mode: self._set_ms_mode(selected))
-        self.ms_mode_actions["off"].setChecked(True)
+            self.channels_group.addAction(action)
+            self.channel_actions[mode] = action
+            action.triggered.connect(lambda _checked=False, selected=mode: self._set_channels(selected))
+        self.channel_actions["interleaved"].setChecked(True)
         self.export_plot_action = self.view_menu.addAction("Export...", self._export_plot)
         self.export_plot_action.setMenuRole(QAction.NoRole)
         self.spectrum.comparison_state_changed.connect(self._update_comparison_actions)
@@ -348,15 +349,19 @@ class MainWindow(QMainWindow):
             self.performance_action.setEnabled(self.unload_action.isEnabled())
             dialog.deleteLater()
 
-    def _set_ms_mode(self, mode):
-        """Select L/R or an M/S excitation, discarding incompatible comparisons and frames."""
-        enabled = mode != "off"
-        excitation = mode if enabled else "interleaved"
-        self.ms_mode_actions[mode].setChecked(True)
-        # Channel meaning changes, so references and snapshots cannot carry across this switch.
+    def _set_ms_mode(self, enabled):
+        """Toggle M/S interpretation independently of the selected input channels."""
+        with QSignalBlocker(self.ms_mode_action):
+            self.ms_mode_action.setChecked(enabled)
+        excitation = next(mode for mode, action in self.channel_actions.items() if action.isChecked())
         self.last_frame = None
         self.spectrum.set_ms_mode(enabled, excitation)
         self.worker.submit("ms_mode", enabled=enabled, excitation=excitation)
+
+    def _set_channels(self, channels):
+        """Select the stimulus channels, retaining stereo or M/S output interpretation."""
+        self.channel_actions[channels].setChecked(True)
+        self._set_ms_mode(self.ms_mode_action.isChecked())
 
     def _select_measurement(self, measurement):
         """Switch stimulus and reset the plot to the measurement's default range."""
@@ -654,7 +659,7 @@ class MainWindow(QMainWindow):
         frame = self.worker.take_frame()
         if (frame is None or frame.measurement != self.spectrum.measurement or
                 frame.ms_mode != self.spectrum.ms_mode or
-                (frame.ms_mode and frame.ms_excitation != self.spectrum.ms_excitation)):
+                (frame.ms_excitation != self.spectrum.ms_excitation)):
             return
         self.last_frame = frame
         if self.active_settings_dialog is not None:
@@ -809,9 +814,10 @@ class MainWindow(QMainWindow):
             return
         if isinstance(state.get("ms_mode"), bool):
             excitation = state.get("ms_excitation", "interleaved")
-            if not isinstance(excitation, str) or excitation not in MS_EXCITATIONS:
+            if not isinstance(excitation, str) or excitation not in INPUT_CHANNELS:
                 excitation = "interleaved"
-            self._set_ms_mode(excitation if state["ms_mode"] else "off")
+            self.channel_actions[excitation].setChecked(True)
+            self._set_ms_mode(state["ms_mode"])
         if isinstance(state.get("show_cursor_values"), bool):
             self.cursor_values_action.setChecked(state["show_cursor_values"])
         if state.get("response_view") in self.view_actions:

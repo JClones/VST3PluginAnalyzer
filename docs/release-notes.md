@@ -8,8 +8,9 @@ response with latency compensation.
 - Added a configurable **Phase calculation threshold** in Settings. Phase and
   group delay below the threshold are omitted at the response edges; bounded gaps
   use dashed interpolation. Magnitude measurements remain available below it.
-- Extended **M/S Mode** with **Interleaved**, **Left only** and **Right only**
-  excitation options.
+- Added independent **M/S Mode** and **Channels** controls. Left-only and
+  right-only excitation works with stereo or M/S analysis, including stereo
+  crosstalk measurements.
 - Plugin editor views are created only when opened. Closing destroys the window
   and view; reopening creates a fresh editor.
 - Plugins without a native editor open the parameter list automatically, with
@@ -22,5 +23,5 @@ response with latency compensation.
 ## Brief description
 
 Improved frequency-response accuracy with complete pre-ringing capture, direct
-group-delay analysis, configurable phase thresholds, new M/S modes, and smoother
-parameter editing.
+group-delay analysis, configurable phase thresholds, independent channel and M/S
+controls, and smoother parameter editing.

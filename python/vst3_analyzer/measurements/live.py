@@ -10,7 +10,7 @@ from ..dsp.impulse import ImpulseResponse
 from ..dsp.noise import NoiseGenerator
 from ..dsp.spectrum import SpectrumResult, analyze_spectrum
 from .impulse import ImpulseCapture
-from .modes import GENERATORS, MEASUREMENTS, MS_EXCITATIONS
+from .modes import GENERATORS, MEASUREMENTS, INPUT_CHANNELS
 from ..dsp.generators import coherent_sine, nearest_bin
 from ..settings import MeasurementSettings
 
@@ -28,7 +28,7 @@ class LiveFrame:
     rate_fps: float = 0.0  # Worker-measured average frames per wall-clock second.
     measurement: str = "harmonic"  # Stimulus and spectrum normalization used for this record.
     ms_mode: bool = False  # Channels contain Mid/Side instead of Left/Right.
-    ms_excitation: str = "interleaved"  # Impulse routing used for this record.
+    ms_excitation: str = "interleaved"  # Selected input channels; historical field name retained for sessions.
 
 
 class RealtimePacer:
@@ -62,13 +62,13 @@ class LiveAnalyzer:
             settings: Immutable sample rate, FFT size, block size and precision settings.
             measurement: Selected impulse, harmonic or generator acquisition identifier.
             ms_mode: Decode output into Mid/Side.
-            ms_excitation: Interleaved Mid/Side impulses, or a left-only/right-only impulse.
+            ms_excitation: Both inputs (alternating Mid/Side impulses in M/S), left only, or right only.
         """
         # Live view retains processor history until an explicit load or settings change.
         if measurement not in MEASUREMENTS and measurement not in GENERATORS:
             raise ValueError("Unknown measurement")
-        if ms_excitation not in MS_EXCITATIONS:
-            raise ValueError("Unknown M/S excitation")
+        if ms_excitation not in INPUT_CHANNELS:
+            raise ValueError("Unknown input channels")
         self.ms_excitation = ms_excitation
         self.ms_mode = bool(ms_mode)  # Requested M/S acquisition and output interpretation.
         self.ms_pending = None  # Mid response awaiting the following Side capture.
@@ -132,16 +132,12 @@ class LiveAnalyzer:
             sine = ((positions == self.impulse_origin) if self.measurement == "frequency" else
                     (positions % (2 * self.settings.fft_size) == 0)).astype(np.float64)
             audio = [sine] * self.channel_count
-            if self.ms_mode and self.channel_count == 2:
-                if self.ms_excitation == "interleaved":
-                    # Alternate common and opposite-polarity impulses on the same plugin instance.
-                    polarity = ((1.0 if self.ms_capture_index % 2 == 0 else -1.0)
-                                if self.measurement == "frequency" else
-                                np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0))
-                    audio = [sine, sine * polarity]
-                else:
-                    silence = np.zeros_like(sine)
-                    audio = [sine, silence] if self.ms_excitation == "left" else [silence, sine]
+            if self.ms_mode and self.channel_count == 2 and self.ms_excitation == "interleaved":
+                # Alternate Mid-only and Side-only impulses for separate M/S paths.
+                polarity = ((1.0 if self.ms_capture_index % 2 == 0 else -1.0)
+                            if self.measurement == "frequency" else
+                            np.where((positions // (2 * self.settings.fft_size)) % 2 == 0, 1.0, -1.0))
+                audio = [sine, sine * polarity]
         elif self.generators:
             # Noise is independent per main-input channel; auxiliary buses remain silent in the native host.
             audio = [generator.generate(self.chunk_size) for generator in self.generators]
@@ -151,6 +147,9 @@ class LiveAnalyzer:
                                  offset=self.samples_processed)
             sine *= 10.0 ** (self.settings.sine_level_dbfs / 20.0)
             audio = [sine] * self.channel_count
+        # Input routing is independent of output interpretation, for every stimulus.
+        if self.channel_count == 2 and self.ms_excitation != "interleaved":
+            audio[1 if self.ms_excitation == "left" else 0] = np.zeros(self.chunk_size)
         output = np.asarray(self.dut.process(audio), dtype=np.float64)
         if output.shape != (self.channel_count, self.chunk_size) or not np.isfinite(output).all():
             raise ValueError("Plugin returned invalid live audio")

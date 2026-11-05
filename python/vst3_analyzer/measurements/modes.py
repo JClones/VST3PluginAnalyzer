@@ -8,4 +8,5 @@ GENERATORS = {"white_noise": "White Noise", "pink_noise": "Pink Noise",
               "silence": "Silence"}  # Continuous generator modes, in menu order.
 SPECTRUM_MODES = ("harmonic", *GENERATORS)  # Modes using a rolling, peak-normalized magnitude FFT.
 
-MS_EXCITATIONS = {"interleaved": "Interleaved", "left": "Left only", "right": "Right only"}
+# Keep the historical default identifier for saved-session compatibility.
+INPUT_CHANNELS = {"interleaved": "Left and right", "left": "Left only", "right": "Right only"}

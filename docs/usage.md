@@ -103,22 +103,25 @@ to +1. Wrapped phase is bounded by ±180°. Plot values below −300 dB are show
 −∞ dB by cursor inspection.
 
 Identical stereo output is magenta; different left/right output is blue/red.
-**Plot → M/S Mode** selects Mid/Side inspection for stereo plugins:
+**Plot → M/S Mode** is a checkbox switching between Left/Right and Mid/Side
+output analysis. **Plot → Channels** independently selects the test inputs:
 
-- **Interleaved** alternates Mid-only and Side-only impulses, measuring M→M and
-  S→S separately. The two plots may briefly be out of sync after parameter changes.
-- **Left only** feeds a unit impulse only to the left input and derives both
-  responses from the same capture.
-- **Right only** does the same with the right input.
-- **Off (Left/Right)** restores the stereo display.
+- **Left and right** (default) feeds both inputs in stereo mode. For M/S Frequency
+  Response and Impulse Response, it alternates Mid-only and Side-only impulses,
+  measuring M→M and S→S separately. Those two plots may briefly be out of sync
+  after parameter changes.
+- **Left only** feeds only the left input; both outputs are measured.
+- **Right only** feeds only the right input; both outputs are measured.
 
-The excitation choice applies to Frequency Response and Impulse Response.
-One-sided responses are normalized to the injected components: Left-only uses
-Mid=L+R and Side=L−R; Right-only uses Mid=L+R and Side=R−L. An unchanged stereo
-signal path therefore reads 0 dB in both frequency plots, with correct phase.
-These one-sided results include cross-conversion between Mid and Side; unlike
-Interleaved, they do not isolate M→M and S→S. Switching the selection clears
-stored curves and references. The selection is saved with the session.
+One-sided stereo excitation exposes crosstalk into the other output. In M/S
+Frequency Response and Impulse Response, one-sided captures are normalized to the
+injected components: Left only uses Mid=L+R and Side=L−R; Right only uses Mid=L+R
+and Side=R−L. An unchanged signal path therefore reads 0 dB in both frequency
+plots, with correct phase. These captures include M/S cross-conversion rather
+than isolating M→M and S→S. Channel selection also routes the harmonic tone and
+signal generators; their M/S outputs use the usual (L+R)/2 and (L−R)/2 decoding.
+Changing either control clears stored curves and references. Both choices are
+saved independently with the session.
 Harmonic response retains equal L/R tone input, and generator signals are unchanged;
 both decode their output to Mid/Side as before.
 
