@@ -11,7 +11,7 @@ from PySide6.QtCore import QSignalBlocker, QByteArray, QEvent, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QFont, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMainWindow, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 
-from .branding import application_icon
+from .branding import APPLICATION_NAME, REPOSITORY_URL, application_icon, application_version
 from .native_menu import clear_native_hide_shortcut
 from .plot_export import EXPORT_FILTERS, export_path, save_plot
 from .settings_dialog import SettingsDialog
@@ -326,6 +326,9 @@ class MainWindow(QMainWindow):
         self.settings_action.setMenuRole(QAction.NoRole)
         self.settings_action.triggered.connect(self._edit_settings)
         window_menu.addAction(self.settings_action)
+        window_menu.addSeparator()
+        self.about_action = window_menu.addAction("About...", self._show_about)
+        self.about_action.setMenuRole(QAction.NoRole)  # Keep it in Window on macOS too.
         # Retain a standard application quit shortcut without adding another top-level menu.
         quit_action = QAction("Quit", self)
         quit_action.setShortcut("Ctrl+Q")
@@ -333,6 +336,12 @@ class MainWindow(QMainWindow):
         self.addAction(quit_action)
         # Older PySide releases need persistent wrappers when menus are retrieved via their actions.
         self.menu_actions = self.menuBar().actions() + plugins.actions()
+
+    def _show_about(self):
+        """Show application version and the public repository link."""
+        QMessageBox.about(self, f"About {APPLICATION_NAME}",
+                          f"<b>{APPLICATION_NAME}</b><br>Version {application_version()}<br><br>"
+                          f'<a href="{REPOSITORY_URL}">{REPOSITORY_URL}</a>')
 
     def _run_performance(self):
         """Display the native timing log and resume the selected measurement when its window closes."""

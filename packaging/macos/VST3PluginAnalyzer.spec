@@ -4,7 +4,7 @@
 from pathlib import Path
 from importlib.metadata import version
 import os
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 
 macos = Path(SPECPATH)
 project = macos.parents[1]
@@ -19,6 +19,7 @@ a = Analysis(
     pathex=[str(project / "python")],
     binaries=[(str(host), "native")],
     datas=collect_data_files("vst3_analyzer.ui", includes=["assets/*.ico", "assets/*.svg"]) +
+          copy_metadata("vst3-plugin-analyzer") +
           [(str(support / "licenses"), "licenses"), (str(support / "build-info.json"), ".")],
     hiddenimports=[],
     hookspath=[],
