@@ -150,7 +150,7 @@ struct PluginHost::Impl {
     PrecisionSupport precision {false, false}; ///< Capabilities queried only while the instance is initialized/inactive.
     bool editor_available = false; ///< Cached support result; a closed editor retains no plugin view.
     EditorState closed_editor_state; ///< Geometry retained without keeping a native window alive.
-    bool editor_queried = false; ///< Whether optional editor availability has been queried for this instance.
+    bool editor_queried = false; ///< Whether an explicit open has determined editor support for this instance.
     bool buses_configured = false; ///< Bus arrangements and activation were negotiated for this instance.
     IPtr<Handler> handler = owned(new Handler); ///< Controller callback lifetime owner.
     HostProcessData data; ///< SDK-owned per-bus audio buffers.
@@ -423,14 +423,9 @@ std::vector<Parameter> PluginHost::parameters() const {
 bool PluginHost::has_editor() const {
     auto& s = *impl_;
     if (!s.controller || !native_editor_supported()) return false;
-    if (!s.editor_queried) {
-        // Probe once, then release the view. Never allocate a throwaway view while
-        // an editor is open: some controllers share their GUI backend between views.
-        const auto view = owned(s.controller->createView(ViewType::kEditor));
-        s.editor_available = native_editor_view_supported(view);
-        s.editor_queried = true;
-    }
-    return s.editor_available;
+    // VST3 has no separate view-capability query. Keep opening available until
+    // explicitly attempted, without running plugin UI constructors just to probe.
+    return !s.editor_queried || s.editor_available;
 }
 
 /** Open or destroy the plugin editor without changing audio processing.
@@ -451,7 +446,9 @@ void PluginHost::show_editor(bool visible) {
         if (!s.controller) throw std::runtime_error("Plugin has no edit controller");
         if (!has_editor()) throw std::runtime_error("Plugin has no default editor");
         const auto view = owned(s.controller->createView(ViewType::kEditor));
-        if (!native_editor_view_supported(view)) throw std::runtime_error("Plugin has no default editor");
+        s.editor_available = native_editor_view_supported(view);
+        s.editor_queried = true;
+        if (!s.editor_available) throw std::runtime_error("Plugin has no default editor");
         s.editor = create_native_editor(view, s.provider->getClassInfo().name());
         s.editor->restore(s.closed_editor_state);
     }

@@ -459,6 +459,10 @@ class MainWindow(QMainWindow):
         # Updating the check state must not issue a second show/hide IPC request.
         if isinstance(state, dict):
             self.editor_state = state
+            if "available" in state:
+                self.editor_action.setEnabled(state["available"])
+            if state.get("show_parameters"):
+                self.parameter_window.show()
         else:
             self.editor_state = {**self.editor_state, "visible": bool(state)}
         visible = self.editor_state["visible"]
@@ -588,6 +592,8 @@ class MainWindow(QMainWindow):
         self._update_plot_title()
         self.parameter_window.setWindowTitle(f"{self.plugin_name} — Parameter List")
         self.parameter_window.set_parameters(result["parameters"])
+        if result.get("show_parameters"):
+            self.parameter_window.show()
         if self.saved_plot_range is not None:
             self.spectrum.plot.getViewBox().setRange(xRange=self.saved_plot_range[0], yRange=self.saved_plot_range[1], padding=0)
             self.saved_plot_range = None
@@ -790,7 +796,7 @@ class MainWindow(QMainWindow):
                 "last_plugin_directory": self.last_plugin_directory, "recent_plugins": self.recent_plugins,
                 "last_preset_directory": self.last_preset_directory,
                 "last_export_directory": self.last_export_directory,
-                "editor": self.editor_state,
+                "editor": {**self.editor_state, "available": self.editor_action.isEnabled()},
                 "show_cursor_values": self.cursor_values_action.isChecked(),
                 "ms_mode": self.spectrum.ms_mode, "ms_excitation": self.spectrum.ms_excitation,
                 "measurement": self.spectrum.measurement, "response_view": self.spectrum.response_view,

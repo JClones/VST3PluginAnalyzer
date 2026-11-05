@@ -10,8 +10,10 @@ response with latency compensation.
   use dashed interpolation. Magnitude measurements remain available below it.
 - Extended **M/S Mode** with **Interleaved**, **Left only** and **Right only**
   excitation options.
-- Closing the plugin editor now destroys its window and view; reopening creates
-  a fresh editor.
+- Plugin editor views are created only when opened. Closing destroys the window
+  and view; reopening creates a fresh editor.
+- Plugins without a native editor open the parameter list automatically, with
+  the default editor command disabled.
 - Added units to values in the F3 parameter window. Values select automatically
   on focus, and background refreshes preserve selection and unfinished edits.
 - FFT size is now selected from powers of two between 1024 and 65536.

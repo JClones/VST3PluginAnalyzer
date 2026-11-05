@@ -85,14 +85,18 @@ class AnalyzerWorker(QThread):
     def _prepare_editor(self, client, state=None):
         """Open a newly loaded editor by default or restore an explicitly saved appearance."""
         # Plugins without a native view remain usable through the parameter list.
-        available = client.request("has_editor")["available"]
+        known_absent = isinstance(state, dict) and state.get("available") is False
+        available = not known_absent and client.request("has_editor")["available"]
         if available:
-            desired = state if isinstance(state, dict) else {"visible": True, "geometry": None}
+            desired = ({"visible": state.get("visible", False), "geometry": state.get("geometry")}
+                       if isinstance(state, dict) else {"visible": True, "geometry": None})
             try:
                 actual = client.request("restore_editor", **desired)
             except HostError as error:
                 # A view attachment failure must not discard a healthy audio stream.
-                self.error.emit(f"Could not open plugin editor: {error}")
+                available = client.request("has_editor")["available"]
+                if available:
+                    self.error.emit(f"Could not open plugin editor: {error}")
                 actual = client.request("get_editor")
         else:
             actual = {"visible": False, "geometry": None}
@@ -106,6 +110,7 @@ class AnalyzerWorker(QThread):
         dut = VST3DUT(client)
         stream = pacer = None
         active_plugin = None
+        editor_available = False
         unsafe = False  # Native failures disallow automatic restore on the next launch.
         last_parameters = 0.0
         pending_exports = []  # File saves serviced after the next normally paced processing block.
@@ -147,12 +152,17 @@ class AnalyzerWorker(QThread):
                             active_plugin = {"path": info["path"], "class_id": info["class_id"]}
                             stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode, self.ms_excitation)
                             has_editor, editor = self._prepare_editor(client, values.get("editor"))
+                            editor_available = has_editor
+                            saved_editor = values.get("editor")
+                            show_parameters = not has_editor and (not isinstance(saved_editor, dict) or
+                                                                   saved_editor.get("visible", False))
                             rate_start = time.monotonic()
                             pacer = RealtimePacer(self.settings.sample_rate, rate_start)
                             self.loaded.emit({"info": info, "parameters": dut.parameters(), "setup": stream.setup,
                                               "programs": client.request("get_programs")["programs"],
                                               "presets": discover_presets(info["path"], info["class_id"]),
-                                              "has_editor": has_editor, "editor": editor})
+                                              "has_editor": has_editor, "editor": editor,
+                                              "show_parameters": show_parameters})
                             self.status.emit("Streaming — collecting FFT")
                         elif operation in ("settings", "measurement", "ms_mode"):
                             if operation == "ms_mode":
@@ -184,7 +194,7 @@ class AnalyzerWorker(QThread):
                                 self.loaded.emit({"info": client.request("plugin_info"),
                                                   "parameters": dut.parameters(), "setup": stream.setup,
                                                   "programs": client.request("get_programs")["programs"],
-                                                  "has_editor": client.request("has_editor")["available"],
+                                                  "has_editor": editor_available,
                                                   "editor": client.request("get_editor")})
                                 self.status.emit("Streaming — collecting FFT after settings change")
                             if operation == "settings":
@@ -218,6 +228,7 @@ class AnalyzerWorker(QThread):
                                 self.error.emit(str(error))
                                 continue
                             editor_state = client.request("get_editor")
+                            editor_state["available"] = editor_available
                             plugin = dict(active_plugin)
                             stream = pacer = None
                             self.cleared.emit()
@@ -225,6 +236,7 @@ class AnalyzerWorker(QThread):
                             client.request("load_preset", path=values["path"])
                             stream = LiveAnalyzer(dut, self.settings, self.measurement, self.ms_mode, self.ms_excitation)
                             has_editor, editor = self._prepare_editor(client, editor_state)
+                            editor_available = has_editor
                             rate_start = time.monotonic()
                             pacer = RealtimePacer(self.settings.sample_rate, rate_start)
                             self.loaded.emit({"info": info, "parameters": dut.parameters(), "setup": stream.setup,
@@ -279,7 +291,12 @@ class AnalyzerWorker(QThread):
                             stream = pacer = None
                             self.cleared.emit()
                         if operation == "editor":
-                            self.editor_changed.emit(False)
+                            editor_available = client.request("has_editor")["available"]
+                            self.editor_changed.emit({**client.request("get_editor"),
+                                                      "available": editor_available,
+                                                      "show_parameters": not editor_available})
+                            if not editor_available:
+                                continue
                         if operation == "performance_start":
                             self.performance_update.emit({"error": str(error)})
                         else:
@@ -361,7 +378,7 @@ class AnalyzerWorker(QThread):
                         raise RuntimeError("Plugin is not in a saveable processing state")
                     stream.step()
                     snapshot = {**active_plugin, "parameters": dut.parameters(), "preset": None,
-                                "editor": client.request("get_editor")}
+                                "editor": {**client.request("get_editor"), "available": editor_available}}
                     if self.preset_path:
                         try:
                             client.request("save_preset", path=str(self.preset_path))

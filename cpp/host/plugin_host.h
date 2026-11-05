@@ -118,7 +118,7 @@ public:
      * @param path Existing .vstpreset file for this effect class, restored before activation.
      */
     void load_preset(const std::string& path);
-    /** Probe optional editor support once; cache the result without retaining a closed view. */
+    /** Return whether opening can be attempted; support is confirmed on first explicit open, without probing views. */
     bool has_editor() const;
     /** Open or destroy the plugin editor without changing the processing stream.
      * @param visible True creates or raises the native editor; false destroys the window and view.

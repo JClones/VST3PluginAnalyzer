@@ -227,6 +227,8 @@ reopening creates a fresh editor without reloading the plugin or interrupting
 processing. The last window geometry is retained. **Window → Parameter List**
 or **F3** opens the analyzer's alternative controls, with sliders, checkboxes and
 editable values. Double-click or Alt-click a slider to reset its default value.
+If the plugin has no native editor, F2 is disabled and the parameter list opens
+automatically when you load it.
 
 Use **Program → Load... / Export...** for `.vstpreset` files. Factory programs
 appear in the same menu when supplied by the plugin. **Plugin → Soft Bypass**

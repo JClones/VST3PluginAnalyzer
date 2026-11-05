@@ -11,6 +11,8 @@ the plugin's own bypass parameter while processing continues, when supported.
 Closing it destroys the native window and plugin view; reopening constructs a
 fresh editor at the last window geometry while audio processing continues.
 **Parameter List** opens the analyzer's floating, scrollable parameter controls.
+For plugins without a native editor, F2 is disabled and the parameter list opens
+automatically on load. Saved sessions retain your parameter-window visibility.
 Enter logical values such as a frequency directly in the value field; the plugin interprets the text.
 Double-click or Alt-click a slider to reset its declared default value. Two-state
 parameters use checkboxes. **Program → Load... / Export...** use `.vstpreset`
