@@ -9,9 +9,9 @@ Ubuntu releases can use the tar archive or source setup below.
 
 ```sh
 # Ubuntu: run in the download directory.
-sudo apt install ./vst3-plugin-analyzer_0.3.0_amd64.deb
+sudo apt install ./vst3-plugin-analyzer_0.3.1_amd64.deb
 # Fedora:
-sudo dnf install ./vst3-plugin-analyzer-0.3.0-1.x86_64.rpm
+sudo dnf install ./vst3-plugin-analyzer-0.3.1-1.x86_64.rpm
 ```
 
 Replace the filenames with those you downloaded. For another build of an already
