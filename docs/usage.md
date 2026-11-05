@@ -46,7 +46,7 @@ supported, float32 otherwise, with float64 analysis and IPC. **Apply** updates t
 measurement and latency display without closing the dialog.
 
 Below **Harmonic Response Test**, the **Frequency Response Test** section contains
-**Phase calculation threshold**, adjustable from −300 to 0 dB (default −160 dB).
+**Phase calculation threshold**, adjustable from −200 to −40 dB (default −160 dB).
 Raise it to exclude more of a noisy stopband. Changing only this threshold keeps
 audio processing and capture history running, and updates live, stored and
 reference plots without discarding their measurements.

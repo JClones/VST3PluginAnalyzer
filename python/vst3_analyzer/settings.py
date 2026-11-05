@@ -39,8 +39,8 @@ class MeasurementSettings:
                 not -6000 <= self.sine_level_dbfs <= 6000):
             raise ValueError("Sine level must be finite and within [-6000, 6000] dBFS")
         if (isinstance(self.phase_threshold_db, bool) or not math.isfinite(self.phase_threshold_db) or
-                not -300 <= self.phase_threshold_db <= 0):
-            raise ValueError("Phase calculation threshold must be finite and within [-300, 0] dB")
+                not -200 <= self.phase_threshold_db <= -40):
+            raise ValueError("Phase calculation threshold must be finite and within [-200, -40] dB")
         selected = math.floor(self.frequency * self.fft_size / self.sample_rate + 0.5)
         if not 1 <= selected < self.fft_size // 2:
             raise ValueError("Nearest frequency bin is DC or Nyquist; change frequency or FFT size")

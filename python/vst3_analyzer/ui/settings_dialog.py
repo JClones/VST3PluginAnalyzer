@@ -61,7 +61,7 @@ class SettingsDialog(QDialog):
         harmonic_layout.addRow("Sine Frequency, Hz", self.frequency)
         harmonic_layout.addRow("Sine Level, dBFS", self.level)
         self.phase_threshold = QDoubleSpinBox()
-        self.phase_threshold.setRange(-300, 0)
+        self.phase_threshold.setRange(-200, -40)
         self.phase_threshold.setDecimals(1)
         self.phase_threshold.setSingleStep(10)
         self.phase_threshold.setSuffix(" dB")

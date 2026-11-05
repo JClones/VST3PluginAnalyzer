@@ -139,8 +139,8 @@ def analyze_frequency_response(samples, sample_rate, phase_threshold_db=DEFAULT_
     if type(latency_samples) is not int or not 0 <= latency_samples < signal.size:
         raise ValueError("Invalid impulse-response latency")
     if (isinstance(phase_threshold_db, bool) or not np.isfinite(phase_threshold_db) or
-            not -300 <= phase_threshold_db <= 0):
-        raise ValueError("Phase calculation threshold must be within [-300, 0] dB")
+            not -200 <= phase_threshold_db <= -40):
+        raise ValueError("Phase calculation threshold must be within [-200, -40] dB")
     if not np.isfinite(sample_rate) or sample_rate <= 0:
         raise ValueError("Invalid sample rate")
     with np.errstate(over="ignore", invalid="ignore", divide="ignore", under="ignore"):
