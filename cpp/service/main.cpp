@@ -12,6 +12,8 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 #include <cmath>
+#include <clocale>
+#include <cstdlib>
 #include <csignal>
 #include <iostream>
 #include <memory>
@@ -420,6 +422,9 @@ private:
  * @param argv Null-terminated argument vector; usage text describes accepted arguments.
  */
 int main(int argc, char** argv) {
+    // Temporarily disabled: force C numeric formatting now and on environment locale reloads.
+    // ::setenv("LC_NUMERIC", "C", 1);
+    // std::setlocale(LC_NUMERIC, "C");
     try {
         std::signal(SIGPIPE, SIG_IGN);
         std::unique_ptr<analyzer::UILauncher> ui;
